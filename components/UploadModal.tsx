@@ -238,7 +238,7 @@ export default function UploadModal({
               )}
 
               {/* ── Step Progress ── */}
-              {isUploading && currentStep !== "success" && !error && (
+              {isUploading && !error && (
                 <div className="animate-fade-up space-y-3 rounded-xl border border-gray-100 bg-stone-50/50 p-5">
                   {STEPS.map((step) => {
                     const isActive = step.key === currentStep;
