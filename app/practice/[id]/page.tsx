@@ -34,6 +34,9 @@ export default function PracticePage({ params }: { params: { id: string } }) {
   const [deckName, setDeckName] = useState("");
   const [resetting, setResetting] = useState(false);
   const floatTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [sessionStart] = useState(Date.now());
+  const [streak, setStreak] = useState(0);
+  const [showStreakBurst, setShowStreakBurst] = useState(false);
 
   const fetchCards = useCallback(async () => {
     setLoading(true);
@@ -53,7 +56,10 @@ export default function PracticePage({ params }: { params: { id: string } }) {
       try {
         const deckRes = await fetch(`/api/decks/${deckId}`);
         const deckData = await deckRes.json();
-        setDeckName(deckData.deck?.name || "Unknown Deck");
+        const dName = deckData.deck?.name || "Unknown Deck";
+        setDeckName(dName);
+        localStorage.setItem('lastDeckId', deckId);
+        localStorage.setItem('lastDeckName', dName);
       } catch (err) {
         console.error("Failed to fetch deck name:", err);
       }
@@ -64,7 +70,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.code === "Space") { e.preventDefault(); if (!isFlipped && !showCompletion) setIsFlipped(true); }
+      if (e.code === "Space") { e.preventDefault(); if (!isFlipped && !showCompletion) handleFlip(); }
       if (isFlipped && !isSubmitting && !showCompletion) {
         if (e.key === "1") handleRate("hard");
         if (e.key === "2") handleRate("okay");
@@ -73,7 +79,45 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  });
+  }, [isFlipped, isSubmitting, showCompletion]);
+
+  const playFlipSound = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.1);
+    } catch (e) {}
+  };
+
+  const playRatingSound = (rating: 'easy'|'okay'|'hard') => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      const freqs = { easy: [600, 900], okay: [500, 600], hard: [400, 200] };
+      oscillator.frequency.setValueAtTime(freqs[rating][0], audioCtx.currentTime);
+      oscillator.frequency.exponentialRampToValueAtTime(freqs[rating][1], audioCtx.currentTime + 0.15);
+      gainNode.gain.setValueAtTime(0.08, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+      oscillator.start(audioCtx.currentTime);
+      oscillator.stop(audioCtx.currentTime + 0.15);
+    } catch (e) {}
+  };
+
+  const handleFlip = () => {
+    setIsFlipped(true);
+    playFlipSound();
+  };
 
   const showFloat = (t: string) => {
     setFloatText(t);
@@ -108,13 +152,25 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     const newHard = rating === "hard" ? hardCount + 1 : hardCount;
     const newOkay = rating === "okay" ? okayCount + 1 : okayCount;
     const newEasy = rating === "easy" ? easyCount + 1 : easyCount;
-    if (rating === "hard") { setHardCount(newHard); setCurrentStreak(0); showFloat("😤 Keep going!"); }
-    else if (rating === "okay") { setOkayCount(newOkay); setCurrentStreak(0); showFloat("😌 Good!"); }
-    else {
+    
+    playRatingSound(rating);
+
+    if (rating === "hard" || rating === "okay") {
+      if (rating === "hard") { setHardCount(newHard); showFloat("😤 Keep going!"); }
+      else { setOkayCount(newOkay); showFloat("😌 Good!"); }
+      setCurrentStreak(0);
+      setStreak(0);
+    } else {
       setEasyCount(newEasy);
       const ns = currentStreak + 1; setCurrentStreak(ns);
       if (ns > bestStreak) setBestStreak(ns);
       showFloat("🎯 Easy!");
+      const newStreak = streak + 1;
+      setStreak(newStreak);
+      if (newStreak >= 3) {
+        setShowStreakBurst(true);
+        setTimeout(() => setShowStreakBurst(false), 1500);
+      }
     }
 
     try {
@@ -212,6 +268,12 @@ export default function PracticePage({ params }: { params: { id: string } }) {
   if (cards.length === 0 || showCompletion) {
     const total = hardCount + okayCount + easyCount;
     const accuracy = total > 0 ? Math.round(((easyCount + okayCount) / total) * 100) : 0;
+    
+    const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+    const mins = Math.floor(elapsed / 60);
+    const secs = elapsed % 60;
+    const timeStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+
     return (
       <div className="flex min-h-screen items-center justify-center px-4"
         style={{ background: "linear-gradient(135deg, #4c1d95, #7c3aed, #6d28d9)", backgroundSize: "200% 200%", animation: "gradient-shift 6s ease infinite" }}>
@@ -242,6 +304,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
               </div>
               <div className="flex gap-6 justify-center">
                 <span className="text-white/90 text-sm">🎯 Accuracy: <strong className="text-white">{accuracy}%</strong></span>
+                <span className="text-white/90 text-sm">⏱️ Time: <strong className="text-white">{timeStr}</strong></span>
                 <span className="text-white/90 text-sm">🔥 Best streak: <strong className="text-white">{bestStreak}</strong></span>
               </div>
             </div>
@@ -279,7 +342,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
           <button onClick={() => router.push(`/deck/${deckId}`)} className="flex items-center gap-1.5 text-sm transition-colors active:scale-95" style={{ color: "var(--text-secondary)" }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Exit
           </button>
-          <span className="rounded-full px-3.5 py-1 text-xs font-bold tabular-nums" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
+          <span key={currentIndex} className="rounded-full px-3.5 py-1 text-xs font-bold tabular-nums inline-block" style={{ background: "var(--surface-2)", color: "var(--text-primary)", animation: 'scale-pop 0.3s ease' }}>
             {currentIndex + 1} / {cards.length}
           </span>
         </div>
@@ -310,10 +373,22 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         </div>
       )}
 
+      {/* Streak Burst */}
+      {showStreakBurst && (
+        <div style={{
+          position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+          fontSize: '48px', fontWeight: 'bold', color: '#f59e0b',
+          textShadow: '0 0 40px rgba(245,158,11,0.8)', animation: 'float-up 1.5s ease forwards',
+          pointerEvents: 'none', zIndex: 100
+        }}>
+          🔥 {streak} streak!
+        </div>
+      )}
+
       {/* Card area */}
       <div className="relative flex flex-1 flex-col items-center justify-center px-4 py-6 sm:px-6" style={{ zIndex: 10 }}>
         <div className={`w-full ${cardAnim}`} key={currentCard.id}>
-          <Flashcard question={currentCard.question} answer={currentCard.answer} isFlipped={isFlipped} onFlip={() => !isFlipped && setIsFlipped(true)} />
+          <Flashcard question={currentCard.question} answer={currentCard.answer} isFlipped={isFlipped} onFlip={() => !isFlipped && handleFlip()} />
         </div>
 
         {isFlipped && (
@@ -355,6 +430,9 @@ export default function PracticePage({ params }: { params: { id: string } }) {
               style={{ background: "rgba(34,197,94,0.06)", borderColor: "rgba(34,197,94,0.2)", color: "#22c55e" }}>
               <span className="text-lg">🎯</span>Easy<span className="text-[10px] font-normal opacity-60">See you later</span>
             </button>
+          </div>
+          <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px', letterSpacing: '0.05em' }}>
+            SPACE to flip · 1 Hard · 2 Okay · 3 Easy
           </div>
         </div>
       </div>

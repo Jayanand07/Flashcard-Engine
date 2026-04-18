@@ -57,13 +57,41 @@ export default function QuizPage({ params }: { params: { id: string } }) {
     })();
   }, [deckId]);
 
-  const handleOptionSelect = (index: number) => {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (!showFeedback && !showCompletion) {
+        if (e.key === '1' && mcqs[currentIndex]?.options.length >= 1) handleOptionSelect(0);
+        if (e.key === '2' && mcqs[currentIndex]?.options.length >= 2) handleOptionSelect(1);
+        if (e.key === '3' && mcqs[currentIndex]?.options.length >= 3) handleOptionSelect(2);
+        if (e.key === '4' && mcqs[currentIndex]?.options.length >= 4) handleOptionSelect(3);
+      } else if (showFeedback && !showCompletion) {
+        if (e.code === 'Space' || e.key === 'Enter') {
+          e.preventDefault();
+          nextQuestion();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [showFeedback, showCompletion, currentIndex, mcqs]);
+
+  const handleOptionSelect = (index: number, e?: React.MouseEvent) => {
     if (showFeedback) return;
     setSelectedOption(index);
     setShowFeedback(true);
     
     const isCorrect = index === mcqs[currentIndex].correct_index;
-    if (isCorrect) setScore(s => s + 1);
+    if (isCorrect) {
+      setScore(s => s + 1);
+      if (e) {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        const x = (rect.left + rect.width / 2) / window.innerWidth;
+        const y = (rect.top + rect.height / 2) / window.innerHeight;
+        confetti({ particleCount: 60, spread: 50, origin: { x, y } });
+      } else {
+        confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } });
+      }
+    }
     
     setResults(prev => [...prev, {
       question: mcqs[currentIndex].question,
@@ -237,8 +265,8 @@ export default function QuizPage({ params }: { params: { id: string } }) {
                 <button
                   key={i}
                   disabled={showFeedback}
-                  onClick={() => handleOptionSelect(i)}
-                  className={`w-full flex items-center gap-4 rounded-2xl p-5 text-left text-sm font-medium border transition-all ${!showFeedback ? "hover:scale-[1.01] hover:border-violet-400" : ""}`}
+                  onClick={(e) => handleOptionSelect(i, e)}
+                  className={`w-full flex items-center gap-4 rounded-2xl p-5 text-left text-sm font-medium border transition-all ${!showFeedback ? "hover:scale-[1.01] hover:border-violet-400" : ""} ${showCorrect ? "scale-[1.02]" : ""} ${showWrong ? "animate-shake" : ""}`}
                   style={{
                     background: showCorrect ? "#dcfce7" : showWrong ? "#fee2e2" : "var(--surface)",
                     borderColor: showCorrect ? "#22c55e" : showWrong ? "#ef4444" : "var(--border)",
@@ -265,6 +293,12 @@ export default function QuizPage({ params }: { params: { id: string } }) {
               <button onClick={nextQuestion} className="mt-6 w-full rounded-2xl py-4 text-sm font-bold text-white shadow-lg transition-transform active:scale-[0.98]" style={{ backgroundColor: "var(--accent)" }}>
                 {currentIndex + 1 === mcqs.length ? "Finish Quiz" : "Next Question →"}
               </button>
+            </div>
+          )}
+          
+          {!showCompletion && (
+            <div className="mt-8 text-center text-[11px] font-medium tracking-wide" style={{ color: "var(--text-secondary)" }}>
+              {showFeedback ? "SPACE / ENTER for next" : "1-4 to answer"}
             </div>
           )}
         </div>

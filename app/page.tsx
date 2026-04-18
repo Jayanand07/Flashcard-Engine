@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { getTodayString } from "@/lib/sm2";
 import Navbar from "@/components/Navbar";
@@ -11,6 +12,7 @@ interface Deck {
   id: string; name: string; card_count: number; created_at: string;
   stats?: { mastered: number; learning: number; newCards: number };
   dueToday?: number;
+  last_studied?: string;
 }
 
 export default function Dashboard() {
@@ -19,6 +21,10 @@ export default function Dashboard() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dailySummary, setDailySummary] = useState<{ cardsReviewed: number, decksCount: number } | null>(null);
+  const [sortBy, setSortBy] = useState('recent');
+  const [lastDeckId, setLastDeckId] = useState<string | null>(null);
+  const [lastDeckName, setLastDeckName] = useState<string | null>(null);
+  const router = useRouter();
 
   const fetchDecks = async () => {
     setLoading(true);
@@ -64,12 +70,35 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  useEffect(() => { fetchDecks(); }, []);
+  useEffect(() => {
+    fetchDecks();
+    setLastDeckId(localStorage.getItem('lastDeckId'));
+    setLastDeckName(localStorage.getItem('lastDeckName'));
+  }, []);
 
   const totalCards = decks.reduce((a, d) => a + d.card_count, 0);
   const totalMastered = decks.reduce((a, d) => a + (d.stats?.mastered ?? 0), 0);
   const totalDue = decks.reduce((a, d) => a + (d.dueToday ?? 0), 0);
-  const filtered = decks.filter(d => d.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  
+  let filtered = decks.filter(d => d.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  if (sortBy === 'recent') {
+    filtered.sort((a, b) => {
+      if (!a.last_studied && !b.last_studied) return 0;
+      if (!a.last_studied) return 1;
+      if (!b.last_studied) return -1;
+      return new Date(b.last_studied).getTime() - new Date(a.last_studied).getTime();
+    });
+  } else if (sortBy === 'due') {
+    filtered.sort((a, b) => (b.dueToday ?? 0) - (a.dueToday ?? 0));
+  } else if (sortBy === 'alpha') {
+    filtered.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sortBy === 'newest') {
+    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  }
+
+  const decksWithDue = decks.filter(d => (d.dueToday ?? 0) > 0);
+  const totalDueCount = totalDue;
+  const mostDueDeckId = decksWithDue.length > 0 ? [...decksWithDue].sort((a, b) => (b.dueToday ?? 0) - (a.dueToday ?? 0))[0].id : null;
 
   const statCards = [
     { label: "Decks", value: decks.length, color: "#7c6af7" },
@@ -147,6 +176,41 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Continue Practicing Banner */}
+        {!loading && decksWithDue.length > 0 && mostDueDeckId && (
+          <div className="animate-fade-up mt-7" style={{
+            background: 'linear-gradient(135deg, #7c6af7, #a855f7)', borderRadius: '16px', padding: '16px 24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+          }}>
+            <div>
+              <div style={{color:'white', fontWeight:'bold', fontSize:'16px'}}>📚 You have cards due for review!</div>
+              <div style={{color:'rgba(255,255,255,0.8)', fontSize:'13px'}}>
+                {totalDueCount} cards across {decksWithDue.length} decks are waiting for you
+              </div>
+            </div>
+            <button onClick={() => router.push(`/practice/${mostDueDeckId}`)} style={{
+              background: 'white', color: '#7c6af7', border: 'none', borderRadius: '10px',
+              padding: '8px 16px', fontWeight: 'bold', cursor: 'pointer', fontSize: '14px'
+            }}>
+              Start Reviewing →
+            </button>
+          </div>
+        )}
+
+        {/* Pick up where you left off */}
+        {!loading && lastDeckId && lastDeckName && (
+          <div className="animate-fade-up mt-6">
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--surface-2)',
+              border: '1px solid var(--border)', borderRadius: '999px', padding: '6px 16px', fontSize: '13px',
+              cursor: 'pointer', marginBottom: '8px'
+            }} onClick={() => router.push(`/practice/${lastDeckId}`)}>
+              <span>▶️ Continue: {lastDeckName}</span>
+              <span style={{color:'var(--accent)'}}>→</span>
+            </div>
+          </div>
+        )}
+
         {/* Search */}
         {(decks.length > 0 || searchQuery) && (
           <div className="animate-fade-up mt-5 relative">
@@ -159,7 +223,17 @@ export default function Dashboard() {
         )}
 
         {!loading && decks.length > 0 && (
-          <h2 className="animate-fade-up animate-delay-100 mt-7 mb-4 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-secondary)" }}>Your Decks</h2>
+          <div className="animate-fade-up animate-delay-100 mt-7 mb-4 flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-secondary)" }}>Your Decks</h2>
+            <select value={sortBy} onChange={e => setSortBy(e.target.value)} 
+              className="rounded-lg px-2.5 py-1.5 text-xs font-medium outline-none cursor-pointer"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border)", color: "var(--text-primary)" }}>
+              <option value="recent">Recently studied</option>
+              <option value="due">Most due</option>
+              <option value="alpha">Alphabetical</option>
+              <option value="newest">Newest</option>
+            </select>
+          </div>
         )}
 
         {loading ? (
@@ -172,7 +246,10 @@ export default function Dashboard() {
             ))}
           </div>
         ) : filtered.length === 0 && searchQuery ? (
-          <div className="mt-16 text-center animate-fade-in"><p className="text-sm" style={{ color: "var(--text-secondary)" }}>No results for &quot;{searchQuery}&quot;</p></div>
+          <div className="mt-16 text-center animate-fade-in">
+            <p className="text-sm mb-3" style={{ color: "var(--text-secondary)" }}>No decks matching &apos;{searchQuery}&apos;</p>
+            <button onClick={() => setSearchQuery("")} className="text-sm font-bold" style={{ color: "var(--accent)" }}>Clear Search</button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {filtered.map((d, i) => (

@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+
+    await supabase.from("decks").update({ last_studied: new Date().toISOString() }).eq("id", deck_id);
+
     return NextResponse.json(data, { status: 201 });
   } catch (error) {
     console.error("Sessions POST API Error:", error);

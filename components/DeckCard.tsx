@@ -8,6 +8,7 @@ interface DeckCardProps {
     id: string; name: string; card_count: number; created_at: string;
     stats?: { mastered: number; learning: number; newCards: number };
     dueToday?: number;
+    last_studied?: string;
   };
   onDeleted: () => void;
 }
@@ -49,22 +50,49 @@ export default function DeckCard({ deck, onDeleted }: DeckCardProps) {
       : { text: "✅ All caught up!", color: "var(--success)", bg: "rgba(34,197,94,0.08)" };
   }
 
+  const getLastStudied = (dateStr?: string | null) => {
+    if (!dateStr) return 'Never studied'
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    return date.toLocaleDateString('en-IN', {day:'numeric', month:'short'})
+  }
+
   return (
     <div className="group relative flex flex-col rounded-[20px] p-6 transition-all duration-200 hover:-translate-y-0.5"
       style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
       onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 40px rgba(124,106,247,0.2)"; e.currentTarget.style.borderColor = "var(--accent)"; }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "var(--border)"; }}>
 
+      {/* Hover Stats Tooltip */}
+      <div className="absolute -top-3 -right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 translate-x-full"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "12px", padding: "12px", width: "160px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)" }}>
+        <p className="text-xs font-bold mb-2 uppercase tracking-widest text-[10px]" style={{ color: "var(--text-secondary)" }}>📊 Quick Stats</p>
+        <div className="text-xs space-y-1" style={{ color: "var(--text-primary)" }}>
+          <p>Mastery: {deck.card_count > 0 ? Math.round((stats.mastered / deck.card_count) * 100) : 0}%</p>
+          <p>Cards due: {due}</p>
+          <p>Last studied: {getLastStudied(deck.last_studied)}</p>
+        </div>
+      </div>
+
       <button onClick={handleDelete} disabled={deleting}
-        className="absolute right-4 top-4 rounded-lg p-1.5 opacity-0 transition-all group-hover:opacity-100"
-        style={{ color: "var(--danger)" }}>
+        className="absolute right-4 top-4 rounded-lg p-1.5 opacity-0 transition-all group-hover:opacity-100 z-10"
+        style={{ color: "var(--danger)", background: "var(--surface)", border: "1px solid var(--border)" }}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
       </button>
 
       <div className="flex items-start justify-between gap-4 pr-6">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-lg font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>{deck.name}</h3>
-          <p className="mt-0.5 text-xs" style={{ color: "var(--text-secondary)" }}>{deck.card_count} cards · {date}</p>
+          <p className="mt-0.5 text-xs" style={{ color: "var(--text-secondary)" }}>Last studied: {getLastStudied(deck.last_studied)} · {deck.card_count} cards</p>
         </div>
         <Ring mastered={stats.mastered} total={deck.card_count} />
       </div>
