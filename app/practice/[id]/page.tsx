@@ -134,14 +134,23 @@ export default function PracticePage({ params }: { params: { id: string } }) {
 
           {total > 0 && (
             <div className="animate-fade-up animate-delay-300 mt-6 space-y-4">
-              <div className="grid grid-cols-3 gap-3 rounded-xl p-4" style={{ background: "rgba(255,255,255,0.06)" }}>
-                <div><div className="text-2xl font-bold text-rose-400">{sessionStats.hard}</div><div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Hard</div></div>
-                <div><div className="text-2xl font-bold text-amber-400">{sessionStats.okay}</div><div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Okay</div></div>
-                <div><div className="text-2xl font-bold text-emerald-400">{sessionStats.easy}</div><div className="text-[10px] font-semibold uppercase tracking-wider text-white/40">Easy</div></div>
+              <div className="grid grid-cols-3 gap-3 w-full">
+                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.2)" }}>
+                  <div className="text-2xl font-bold text-white">{sessionStats.hard}</div>
+                  <div className="text-xs text-white/70 uppercase tracking-wide">Hard</div>
+                </div>
+                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.2)" }}>
+                  <div className="text-2xl font-bold text-white">{sessionStats.okay}</div>
+                  <div className="text-xs text-white/70 uppercase tracking-wide">Okay</div>
+                </div>
+                <div className="rounded-xl p-3 text-center" style={{ background: "rgba(255,255,255,0.2)" }}>
+                  <div className="text-2xl font-bold text-white">{sessionStats.easy}</div>
+                  <div className="text-xs text-white/70 uppercase tracking-wide">Easy</div>
+                </div>
               </div>
-              <div className="flex justify-around text-sm text-white/70">
-                <span>🎯 Accuracy: <strong className="text-white">{accuracy}%</strong></span>
-                <span>🔥 Best streak: <strong className="text-white">{bestStreak}</strong></span>
+              <div className="flex gap-6 justify-center">
+                <span className="text-white/90 text-sm">🎯 Accuracy: <strong className="text-white">{accuracy}%</strong></span>
+                <span className="text-white/90 text-sm">🔥 Best streak: <strong className="text-white">{bestStreak}</strong></span>
               </div>
             </div>
           )}

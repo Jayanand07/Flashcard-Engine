@@ -10,7 +10,7 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
   React.useEffect(() => setMounted(true), []);
 
   return (
-    <nav className="sticky top-0 z-50 border-b backdrop-blur-xl" style={{ background: "color-mix(in srgb, var(--bg) 85%, transparent)", borderColor: "var(--border)" }}>
+    <nav className="sticky top-0 z-50 border-b backdrop-blur-xl bg-white/85 dark:bg-[#0d0d12]/85" style={{ borderColor: "var(--border)" }}>
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-6">
         <div className="flex items-center gap-2">
           <span className="text-xl">⚡</span>

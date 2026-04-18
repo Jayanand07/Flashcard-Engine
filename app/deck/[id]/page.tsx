@@ -139,11 +139,11 @@ export default function DeckPage({ params }: { params: { id: string } }) {
                 </span>
               </div>
 
-              {/* Segmented progress bar */}
-              <div className="flex h-2.5 w-full overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
-                <div style={{ width: `${mp}%`, background: "#22c55e", transition: "width 0.5s" }} />
-                <div style={{ width: `${lp}%`, background: "#f59e0b", transition: "width 0.5s" }} />
-                <div style={{ width: `${np}%`, background: "#d1d5db", transition: "width 0.5s" }} />
+              {/* Segmented progress bar — 3 separate divs */}
+              <div className="flex h-3 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <div className="bg-green-500 transition-all duration-500" style={{ width: `${mp}%` }} />
+                <div className="bg-amber-400 transition-all duration-500" style={{ width: `${lp}%` }} />
+                <div className="bg-gray-300 dark:bg-gray-600 transition-all duration-500" style={{ width: `${np}%` }} />
               </div>
 
               {/* Legend */}
