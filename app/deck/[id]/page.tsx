@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { getTodayString } from "@/lib/sm2";
 import Navbar from "@/components/Navbar";
 
@@ -35,6 +35,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    const supabase = createClient();
     const { data: d, error: de } = await supabase.from("decks").select("*").eq("id", deckId).single();
     if (de || !d) { setFetchError("Deck not found"); setLoading(false); return; }
     setDeck(d);
@@ -58,6 +59,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
   const handleDelete = async () => {
     if (!deck || !confirm("Delete this deck?")) return;
     setIsDeleting(true);
+    const supabase = createClient();
     const { error } = await supabase.from("decks").delete().eq("id", deck.id);
     if (!error) router.push("/"); else { alert("Failed"); setIsDeleting(false); }
   };

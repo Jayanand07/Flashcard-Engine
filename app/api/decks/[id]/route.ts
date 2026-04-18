@@ -15,6 +15,7 @@ export async function GET(
     }
 
     const supabase = createClient();
+    // Don't filter by user_id for fetch — RLS handles it
     const { data: deck, error } = await supabase
       .from(SUPABASE_TABLES.DECKS)
       .select("*")

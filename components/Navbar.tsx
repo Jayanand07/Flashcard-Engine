@@ -55,7 +55,11 @@ const Navbar = ({ onUploadClick }: NavbarProps) => {
 
   return (
     <nav className="navbar-gradient-border sticky top-0 z-50 backdrop-blur-xl"
-      style={{ backgroundColor: "color-mix(in srgb, var(--bg) 85%, transparent)" }}>
+      style={{ 
+        backgroundColor: mounted && theme === 'light' 
+          ? 'rgba(255,255,255,0.9)' 
+          : 'color-mix(in srgb, var(--bg) 85%, transparent)' 
+      }}>
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         {/* Left: logo + nav */}
         <div className="flex items-center gap-4 sm:gap-6">
