@@ -8,7 +8,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 export async function generateFlashcards(
   extractedText: string
 ): Promise<Array<{ question: string; answer: string }>> {
-  const trimmedText = extractedText.substring(0, 15000);
+  const trimmedText = extractedText.substring(0, 30000);
 
   const prompt = `You are an expert teacher and educational content designer with 20 years of experience creating study material for students.
 
@@ -26,7 +26,7 @@ CARD TYPES TO INCLUDE (mix all of these):
 - Tricky: Questions that test deep understanding not surface recall
 
 STRICT RULES:
-- Generate exactly 20 cards minimum, 25 maximum
+- Generate exactly 50 flashcards
 - Every question must be specific, never vague
 - Every answer must be complete but concise (2-4 sentences max)
 - Never generate duplicate concepts

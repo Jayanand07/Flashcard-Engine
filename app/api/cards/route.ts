@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         .neq("difficulty", "mastered")
         .or(`next_review.lte.${today},difficulty.eq.new`)
         .order("next_review", { ascending: true })
-        .limit(20);
+        .limit(50);
 
       if (e1) throw new Error(`Failed to fetch cards: ${e1.message}`);
 
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         .eq("deck_id", deck_id)
         .lte("next_review", today)
         .order("next_review", { ascending: true })
-        .limit(20);
+        .limit(50);
 
       if (e2) throw new Error(`Failed to fetch cards: ${e2.message}`);
       return NextResponse.json(fallbackCards || [], { status: 200 });
