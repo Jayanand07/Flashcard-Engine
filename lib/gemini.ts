@@ -5,6 +5,25 @@ const apiKey = process.env.GEMINI_API_KEY!;
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
+const extractJSON = (text: string): string => {
+  const firstBracket = text.indexOf("[");
+  const lastBracket = text.lastIndexOf("]");
+  
+  if (firstBracket === -1 || lastBracket === -1) {
+    throw new Error("No JSON array found in AI response");
+  }
+  
+  return text.slice(firstBracket, lastBracket + 1);
+};
+
+const validateItems = (parsed: any, requiredFields: string[]): any[] => {
+  if (!Array.isArray(parsed)) throw new Error("AI response is not a valid JSON array");
+  
+  return parsed.filter(item => {
+    return requiredFields.every(field => field in item && item[field] !== null);
+  });
+};
+
 export async function generateFlashcards(
   extractedText: string
 ): Promise<Array<{ question: string; answer: string }>> {
@@ -47,14 +66,12 @@ ${trimmedText}`;
     const response = await result.response;
     const text = response.text();
 
-    // Strictly isolate the JSON Array from the response
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) {
-      throw new Error("No JSON array found in the AI response");
-    }
-
-    const flashcards = JSON.parse(match[0]);
-    return flashcards;
+    const jsonText = extractJSON(text);
+    const parsed = JSON.parse(jsonText);
+    const validated = validateItems(parsed, ["question", "answer"]);
+    
+    if (validated.length === 0) throw new Error("No valid flashcards generated");
+    return validated;
   } catch (error) {
     throw new Error(
       "Failed to parse generated flashcards from AI response. Details: " +
@@ -97,10 +114,12 @@ ${trimmedText}`;
     const response = await result.response;
     const text = response.text();
 
-    const match = text.match(/\[[\s\S]*\]/);
-    if (!match) throw new Error("No JSON array found in the AI response");
-
-    return JSON.parse(match[0]);
+    const jsonText = extractJSON(text);
+    const parsed = JSON.parse(jsonText);
+    const validated = validateItems(parsed, ["question", "options", "correct_index", "explanation"]);
+    
+    if (validated.length === 0) throw new Error("No valid MCQs generated");
+    return validated;
   } catch (error) {
     throw new Error(
       "Failed to parse generated MCQs. Details: " +

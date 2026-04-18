@@ -10,9 +10,9 @@ export async function POST(
   try {
     const { deckId } = params;
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -47,10 +47,11 @@ export async function POST(
     // 5. Insert new cards
     const cardsToInsert = newCards.map((c: { question: string, answer: string }) => ({
       deck_id: deckId,
+      user_id: user.id,
       question: c.question,
       answer: c.answer,
       difficulty: 'new',
-      interval: 0,
+      interval: 1,
       ease_factor: 2.5,
       next_review: new Date().toISOString().split('T')[0]
     }));

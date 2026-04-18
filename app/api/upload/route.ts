@@ -23,10 +23,10 @@ export async function POST(req: Request) {
     }
 
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { user } } = await supabase.auth.getUser();
     
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     // 1. Create the deck first
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const { data: deck, error: deckError } = await supabase
       .from(SUPABASE_TABLES.DECKS)
       .insert({
-        user_id: session.user.id,
+        user_id: user.id,
         name: deckName,
         card_count: 0,
         last_studied: null
@@ -62,10 +62,11 @@ export async function POST(req: Request) {
     // 4. Insert Flashcards
     const cardsToInsert = flashcards.map((c: { question: string, answer: string }) => ({
       deck_id: deck.id,
+      user_id: user.id,
       question: c.question,
       answer: c.answer,
       difficulty: 'new',
-      interval: 0,
+      interval: 1, // Start with 1, not 0
       ease_factor: 2.5,
       next_review: getTodayString()
     }));
@@ -79,6 +80,7 @@ export async function POST(req: Request) {
     // 5. Insert MCQs
     const mcqsToInsert = mcqs.map((m: { question: string, options: string[], correct_index: number, explanation: string }) => ({
       deck_id: deck.id,
+      user_id: user.id,
       question: m.question,
       options: m.options,
       correct_index: m.correct_index,
