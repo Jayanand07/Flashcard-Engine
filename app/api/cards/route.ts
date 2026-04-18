@@ -17,37 +17,40 @@ export async function GET(req: NextRequest) {
     let query = supabase.from("cards").select("*").eq("deck_id", deck_id);
 
     if (due_only === "true") {
-      // Smart card selection: overdue first, then new, exclude mastered, limit 20
       const today = getTodayString();
 
-      // 1. Get overdue + new cards (not mastered)
-      const { data: priorityCards, error: e1 } = await supabase
+      // Implement exactly: 
+      // WHERE deck_id = [deckId] AND (next_review <= CURRENT_DATE OR difficulty = 'new')
+      const { data: eligibleCards, error } = await supabase
         .from("cards")
         .select("*")
         .eq("deck_id", deck_id)
-        .neq("difficulty", "mastered")
-        .or(`next_review.lte.${today},difficulty.eq.new`)
-        .order("next_review", { ascending: true })
-        .limit(50);
+        .or(`next_review.lte.${today},difficulty.eq.new`);
 
-      if (e1) throw new Error(`Failed to fetch cards: ${e1.message}`);
+      if (error) throw new Error(`Failed to fetch cards: ${error.message}`);
 
-      // 2. If we got enough, return them
-      if (priorityCards && priorityCards.length > 0) {
-        return NextResponse.json(priorityCards, { status: 200 });
-      }
+      let cards = eligibleCards || [];
 
-      // 3. Fallback: include mastered cards if nothing else available
-      const { data: fallbackCards, error: e2 } = await supabase
-        .from("cards")
-        .select("*")
-        .eq("deck_id", deck_id)
-        .lte("next_review", today)
-        .order("next_review", { ascending: true })
-        .limit(50);
+      // Implement exact sorting logic:
+      // Mastered cards never show unless everything else is done.
+      // ORDER BY CASE WHEN next_review <= CURRENT_DATE THEN 0 ELSE 1 END, next_review ASC
+      cards.sort((a, b) => {
+        // 1. Mastered last
+        const aMastered = a.difficulty === "mastered" ? 1 : 0;
+        const bMastered = b.difficulty === "mastered" ? 1 : 0;
+        if (aMastered !== bMastered) return aMastered - bMastered;
 
-      if (e2) throw new Error(`Failed to fetch cards: ${e2.message}`);
-      return NextResponse.json(fallbackCards || [], { status: 200 });
+        // 2. CASE WHEN next_review <= CURRENT_DATE THEN 0 ELSE 1 END
+        const aDue = a.next_review <= today ? 0 : 1;
+        const bDue = b.next_review <= today ? 0 : 1;
+        if (aDue !== bDue) return aDue - bDue;
+
+        // 3. next_review ASC (older dates first)
+        return a.next_review.localeCompare(b.next_review);
+      });
+
+      // LIMIT 50
+      return NextResponse.json(cards.slice(0, 50), { status: 200 });
     }
 
     // Non-due: return all cards
