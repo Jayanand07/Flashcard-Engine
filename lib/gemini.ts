@@ -10,37 +10,44 @@ export async function generateFlashcards(
 ): Promise<Array<{ question: string; answer: string }>> {
   const trimmedText = extractedText.substring(0, 30000);
 
-  const prompt = `You are an expert teacher and educational content designer with 20 years of experience creating study material for students.
+  const prompt = `You are a world-class educator with 
+20 years of experience creating study materials.
 
-Your task is to generate the highest quality flashcards possible from the provided content. A lazy AI generates shallow definition cards. You generate cards that make students truly understand.
+Analyze the following content deeply and generate 
+exactly 50 flashcards that would help a student 
+truly MASTER this material — not just memorize it.
 
-CARD TYPES TO INCLUDE (mix all of these):
-- Conceptual: "What is X and why does it matter?"
-- Definitional: "Define [term] in simple words"
-- Relational: "How does X relate to Y?"
-- Application: "Give a real-world example of X"
-- Edge case: "What happens when X condition occurs?"
-- Worked example: "Walk through how to solve X"
-- Comparison: "What is the difference between X and Y?"
-- Cause & effect: "What causes X? What are its effects?"
-- Tricky: Questions that test deep understanding not surface recall
+MANDATORY card type distribution:
+- 10 cards: Core concept definitions 
+  ("What is X?", "Define Y")
+- 10 cards: Deep understanding 
+  ("Why does X happen?", "How does X work?")
+- 8 cards: Relationships and comparisons 
+  ("How does X differ from Y?", "What connects X and Y?")
+- 8 cards: Real-world application 
+  ("Give an example of X in practice")
+- 7 cards: Edge cases and exceptions 
+  ("What happens when X fails?", "When does Y not apply?")
+- 7 cards: Cause and effect 
+  ("What causes X?", "What are consequences of Y?")
+- 5 cards: Synthesis questions 
+  ("Explain how X, Y, and Z work together")
+- 5 cards: Tricky misconception busters 
+  ("Why do people wrongly think X?")
 
-STRICT RULES:
-- Generate exactly 50 flashcards
-- Every question must be specific, never vague
-- Every answer must be complete but concise (2-4 sentences max)
-- Never generate duplicate concepts
-- Never generate trivial or obvious cards
-- Questions must make sense WITHOUT reading the PDF
-- Answers must be self-contained and clear
-- Vary question types — never 3 same types in a row
-- If content has examples or worked problems — include them as cards
-- If content has formulas — include them with explanation
+STRICT QUALITY RULES:
+- Every question must be answerable WITHOUT the PDF
+- Every answer must be self-contained (2-4 sentences)
+- No two cards can test the same concept
+- Questions must be specific, never vague
+- Include actual numbers, names, examples from the content
+- Write like a great teacher explaining to a smart student
+- Vary sentence structure across all 50 questions
 
-Return ONLY a valid JSON array, no markdown, no backticks:
+Return ONLY a valid JSON array with NO markdown:
 [{"question": "...", "answer": "..."}]
 
-Content:
+Content to analyze:
 ${trimmedText}`;
 
   try {
