@@ -1,19 +1,26 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { calculateSM2, getTodayString, Rating } from "@/lib/sm2";
 import { SUPABASE_TABLES, MAX_CARDS_PER_SESSION } from "@/lib/constants";
 import { isValidUUID } from "@/lib/utils";
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   try {
-    const deck_id = req.nextUrl.searchParams.get("deck_id");
-    const due_only = req.nextUrl.searchParams.get("due_only");
+    const { searchParams } = new URL(req.url);
+    const deck_id = searchParams.get("deck_id");
+    const due_only = searchParams.get("due_only");
 
     if (!deck_id || !isValidUUID(deck_id)) {
       return NextResponse.json({ error: "Invalid deck ID" }, { status: 400 });
     }
     
     const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      return NextResponse.json([]);
+    }
+
     const today = getTodayString();
 
     if (due_only === "true") {
@@ -51,13 +58,13 @@ export async function GET(req: NextRequest) {
 
     if (error) throw error;
     return NextResponse.json(cards);
-  } catch (error) {
-    console.error("[api/cards/GET]", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (err) {
+    console.error("[api/cards/GET]", err);
+    return NextResponse.json([]);
   }
 }
 
-export async function PATCH(req: NextRequest) {
+export async function PATCH(req: Request) {
   try {
     const body = await req.json();
     const { card_id, rating, current_interval, current_ease_factor, current_difficulty } = body;
@@ -71,6 +78,12 @@ export async function PATCH(req: NextRequest) {
     }
 
     const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const sm2Result = calculateSM2(
       {
         interval: current_interval,
@@ -94,8 +107,8 @@ export async function PATCH(req: NextRequest) {
 
     if (error) throw error;
     return NextResponse.json(updatedCard);
-  } catch (error) {
-    console.error("[api/cards/PATCH]", error);
+  } catch (err) {
+    console.error("[api/cards/PATCH]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

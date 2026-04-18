@@ -7,10 +7,13 @@ import { Deck } from "@/lib/types";
 export async function GET() {
   try {
     const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
     
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Get session - if no session, still proceed (anonymous auth will handle it)
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // If no session at all, return empty decks (ISSUE 1 fix)
+    if (!session) {
+      return NextResponse.json({ decks: [] });
     }
 
     // 1. Fetch decks
@@ -59,8 +62,8 @@ export async function GET() {
     }));
 
     return NextResponse.json({ decks });
-  } catch (error) {
-    console.error("[api/decks/GET]", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (err) {
+    console.error("[api/decks/GET]", err);
+    return NextResponse.json({ decks: [] });
   }
 }

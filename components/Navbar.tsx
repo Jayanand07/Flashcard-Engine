@@ -34,12 +34,17 @@ const Navbar = ({ onUploadClick }: NavbarProps) => {
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
-    router.refresh();
-  }, [supabase.auth, router]);
+    window.location.href = '/';
+  }, [supabase.auth]);
 
-  const handleSignIn = useCallback(() => {
-    router.push('/login');
-  }, [router]);
+  const handleSignIn = useCallback(async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`
+      }
+    });
+  }, [supabase.auth]);
 
   const handleThemeToggle = useCallback(() => {
     setTheme(theme === "dark" ? "light" : "dark");

@@ -108,3 +108,24 @@ ${trimmedText}`;
     );
   }
 }
+
+export async function explainFlashcard(question: string, answer: string): Promise<string> {
+  const prompt = `You are an expert tutor. A student is looking at the following flashcard:
+Question: ${question}
+Answer: ${answer}
+
+Provide a brief (2-4 sentences), encouraging, and deep explanation of WHY this is the answer. 
+Break down any complex terms. Focus on deep understanding, not just memorization.
+Write in a friendly, conversational tone.
+
+Return ONLY the explanation text, no markdown.`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    return response.text().trim();
+  } catch (error) {
+    console.error("Explanation failure:", error);
+    return "I'm sorry, I couldn't generate an explanation for this card at the moment.";
+  }
+}
