@@ -140,6 +140,21 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     } finally { setIsExplaining(false); }
   }, [cards, currentIndex, explanationMap]);
 
+  if (!cardsLoading && cards.length === 0) return (
+    <div className="flex min-h-screen flex-col" style={{ backgroundColor: "var(--bg)" }}>
+       <Navbar />
+       <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center px-4 text-center">
+          <div className="mb-6 text-6xl">🎉</div>
+          <h2 className="text-2xl font-black mb-2">No cards due today!</h2>
+          <p className="text-secondary mb-8 font-medium">You&apos;ve cleared your deck for now. Great work staying on top of your study!</p>
+          <button onClick={() => router.push(`/deck/${deckId}`)}
+            className="w-full rounded-2xl bg-accent py-4 text-sm font-black text-white shadow-xl transition-all hover:scale-[1.02] active:scale-[0.98]">
+            Back to Deck
+          </button>
+       </div>
+    </div>
+  );
+
   if (cardsLoading) return (
     <div className="flex min-h-screen flex-col" style={{ backgroundColor: "var(--bg)" }}>
       <Navbar />
@@ -236,7 +251,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
 
         {isFlipped && (
           <div className="mt-8 w-full max-w-[680px] animate-fade-in px-4">
-             {!explanationMap[cards[currentIndex].id] ? (
+             {cards[currentIndex] && !explanationMap[cards[currentIndex].id] ? (
                 <button onClick={handleExplain} disabled={isExplaining}
                   className="mx-auto flex items-center gap-2 rounded-xl bg-surface-2 px-6 py-3 text-sm font-black text-primary transition-all hover:bg-border disabled:opacity-50">
                    {isExplaining ? "Thinking..." : "✨ Ask AI to explain"}

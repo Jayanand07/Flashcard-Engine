@@ -281,9 +281,17 @@ export default function QuizPage({ params }: { params: { id: string } }) {
             )}
           </div>
         ) : (
-          <div className="text-center">
-            <p className="mb-6 font-bold text-secondary">No quiz data found.</p>
-            <button onClick={() => router.push("/")} className="rounded-xl bg-accent px-8 py-3 text-sm font-black text-white">Go Home</button>
+          <div className="text-center py-12">
+            <div className="text-6xl mb-6">📝</div>
+            <h2 className="text-3xl font-black mb-3">No quiz available yet</h2>
+            <p className="text-secondary max-w-sm mx-auto mb-8 font-medium">
+              This deck was created before Quiz mode was added. 
+              Regenerate this deck to get 20 MCQ questions!
+            </p>
+            <button onClick={() => router.push(`/deck/${deckId}`)}
+              className="rounded-2xl bg-accent px-8 py-4 text-sm font-black text-white shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+              Go to Deck → Regenerate
+            </button>
           </div>
         )}
       </main>

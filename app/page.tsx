@@ -26,7 +26,7 @@ export default function Dashboard() {
 
   // Stats for the grid
   const stats = useMemo(() => {
-    const totalCards = decks.reduce((a, d) => a + d.card_count, 0);
+    const totalCards = decks.reduce((a, d) => a + (d.card_count || 0), 0);
     const totalMastered = decks.reduce((a, d) => a + (d.stats?.mastered ?? 0), 0);
     return [
       { label: "Decks", value: decks.length, color: "#7c6af7" },
