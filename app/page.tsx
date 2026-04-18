@@ -199,7 +199,7 @@ export default function Dashboard() {
         )}
 
         {/* Pick up where you left off */}
-        {!loading && lastDeckId && lastDeckName && (
+        {!loading && lastDeckId && lastDeckName && decks.some(d => d.id === lastDeckId) && (
           <div className="animate-fade-up mt-6">
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'var(--surface-2)',
