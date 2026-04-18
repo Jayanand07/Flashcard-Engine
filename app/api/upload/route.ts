@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { generateFlashcards } from "@/lib/gemini";
+import { generateFlashcards, generateMCQs } from "@/lib/gemini";
 import { getTodayString } from "@/lib/sm2";
 export async function POST(req: NextRequest) {
   try {
@@ -64,6 +64,16 @@ export async function POST(req: NextRequest) {
       throw new Error("Deck creation returned no data");
     }
 
+    // New Step: Generate MCQs
+    let mcqs;
+    try {
+      mcqs = await generateMCQs(name);
+      console.log(`Successfully generated ${mcqs.length} MCQs.`);
+    } catch (mcqError) {
+      console.error("Gemini MCQ generation failed:", mcqError);
+      // We don't fail the whole process if MCQs fail, but we'll try to insert them only if they exist
+    }
+
     // Step 5 - Save all cards to Supabase
     const today = getTodayString();
     const cardsArray = flashcards.map(
@@ -84,6 +94,19 @@ export async function POST(req: NextRequest) {
 
     if (cardsError) {
       throw new Error(`Failed to insert cards: ${cardsError.message}`);
+    }
+
+    // Step 5.5 - Save all MCQs to Supabase
+    if (mcqs && mcqs.length > 0) {
+      const mcqsArray = mcqs.map(m => ({
+        deck_id: deck.id,
+        question: m.question,
+        options: m.options,
+        correct_index: m.correct_index,
+        explanation: m.explanation
+      }));
+      const { error: mcqsError } = await supabase.from("mcqs").insert(mcqsArray);
+      if (mcqsError) console.error("Failed to insert MCQs:", mcqsError.message);
     }
 
     // Step 6 - Return success

@@ -63,3 +63,42 @@ ${trimmedText}`;
     );
   }
 }
+
+export async function generateMCQs(
+  topic: string
+): Promise<Array<{ question: string; options: string[]; correct_index: number; explanation: string }>> {
+  const prompt = `You are an expert teacher creating a quiz.
+Generate exactly 20 multiple choice questions about: ${topic}
+
+Rules:
+- 4 options each (A, B, C, D)
+- Exactly 1 correct answer
+- Options must be plausible (not obviously wrong)
+- Include a clear explanation for the correct answer
+- Vary difficulty: 30% easy, 50% medium, 20% hard
+- Cover different aspects of the topic
+
+Return ONLY valid JSON array:
+[{
+  "question": "string",
+  "options": ["string", "string", "string", "string"],
+  "correct_index": number (0-3),
+  "explanation": "string"
+}]`;
+
+  try {
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    let text = response.text();
+
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error("No JSON array found in the AI response");
+
+    return JSON.parse(match[0]);
+  } catch (error) {
+    throw new Error(
+      "Failed to parse generated MCQs. Details: " +
+        (error instanceof Error ? error.message : String(error))
+    );
+  }
+}

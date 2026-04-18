@@ -7,30 +7,49 @@ import { supabase } from "@/lib/supabase";
 import { getTodayString } from "@/lib/sm2";
 import Navbar from "@/components/Navbar";
 
-interface Deck { id: string; name: string; card_count: number; created_at: string; }
+interface Deck { 
+  id: string; 
+  name: string; 
+  card_count: number; 
+  created_at: string; 
+  regenerate_count?: number;
+}
 interface Card { id: string; deck_id: string; question: string; answer: string; difficulty: string; next_review: string; created_at: string; }
+interface HistoryEntry { id: string; generation_number: number; cards: Card[]; saved_at: string; }
 
 export default function DeckPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const deckId = params.id;
   const [deck, setDeck] = useState<Deck | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showRegenModal, setShowRegenModal] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const { data: d, error: de } = await supabase.from("decks").select("*").eq("id", deckId).single();
+    if (de || !d) { setFetchError("Deck not found"); setLoading(false); return; }
+    setDeck(d);
+
+    const [cardsRes, historyRes] = await Promise.all([
+      supabase.from("cards").select("*").eq("deck_id", deckId).order("created_at", { ascending: true }),
+      supabase.from("deck_history").select("*").eq("deck_id", deckId).order("generation_number", { ascending: false })
+    ]);
+
+    setCards(cardsRes.data || []);
+    setHistory(historyRes.data || []);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      const { data: d, error: de } = await supabase.from("decks").select("*").eq("id", deckId).single();
-      if (de || !d) { setFetchError("Deck not found"); setLoading(false); return; }
-      setDeck(d);
-      const { data: c } = await supabase.from("cards").select("*").eq("deck_id", deckId).order("created_at", { ascending: true });
-      setCards(c || []);
-      setLoading(false);
-    })();
+    fetchData();
   }, [deckId]);
 
   const handleDelete = async () => {
@@ -38,6 +57,23 @@ export default function DeckPage({ params }: { params: { id: string } }) {
     setIsDeleting(true);
     const { error } = await supabase.from("decks").delete().eq("id", deck.id);
     if (!error) router.push("/"); else { alert("Failed"); setIsDeleting(false); }
+  };
+
+  const handleRegenerate = async () => {
+    if (isRegenerating) return;
+    setIsRegenerating(true);
+    try {
+      const res = await fetch(`/api/regenerate/${deckId}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Regeneration failed");
+      
+      // Auto redirect to practice mode after successful regeneration
+      router.push(`/practice/${deckId}`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to regenerate");
+      setIsRegenerating(false);
+      setShowRegenModal(false);
+    }
   };
 
   if (loading) return (
@@ -62,18 +98,18 @@ export default function DeckPage({ params }: { params: { id: string } }) {
 
   const today = getTodayString();
   const total = cards.length || 1;
-  const mastered = cards.filter(c => c.difficulty === "mastered").length;
-  const learning = cards.filter(c => c.difficulty === "learning").length;
-  const newCards = cards.filter(c => c.difficulty === "new").length;
+  const masteredCount = cards.filter(c => c.difficulty === "mastered").length;
+  const learningCount = cards.filter(c => c.difficulty === "learning").length;
+  const newCount = cards.filter(c => c.difficulty === "new").length;
   const dueToday = cards.filter(c => c.next_review <= today).length;
 
-  const retention = cards.length > 0 ? Math.round((mastered / cards.length) * 100) : 0;
+  const retention = Math.round((masteredCount / total) * 100);
   const retentionColor = retention > 70 ? "var(--success)" : retention >= 30 ? "var(--warning)" : "var(--danger)";
   const retentionMsg = retention === 0 ? "Keep practicing!" : retention < 50 ? "Getting there! 💪" : retention < 80 ? "Great progress! 🔥" : "Almost mastered! ⭐";
 
-  const mp = (mastered / total) * 100;
-  const lp = (learning / total) * 100;
-  const np = (newCards / total) * 100;
+  const mp = (masteredCount / total) * 100;
+  const lp = (learningCount / total) * 100;
+  const np = (newCount / total) * 100;
 
   const filtered = cards.filter(c => c.question.toLowerCase().includes(searchQuery.toLowerCase()));
   const date = new Date(deck.created_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
@@ -81,8 +117,8 @@ export default function DeckPage({ params }: { params: { id: string } }) {
   const stats = [
     { label: "Total", value: cards.length, color: "#7c6af7", textColor: "var(--text-primary)" },
     { label: "Due Today", value: dueToday, color: "#f59e0b", textColor: dueToday > 0 ? "var(--warning)" : "var(--text-primary)" },
-    { label: "Mastered", value: mastered, color: "#22c55e", textColor: "var(--success)" },
-    { label: "Learning", value: learning, color: "#a855f7", textColor: "var(--accent)" },
+    { label: "Mastered", value: masteredCount, color: "#22c55e", textColor: "var(--success)" },
+    { label: "Learning", value: learningCount, color: "#a855f7", textColor: "var(--accent)" },
   ];
 
   return (
@@ -94,19 +130,35 @@ export default function DeckPage({ params }: { params: { id: string } }) {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
             Dashboard
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: "var(--text-primary)" }}>{deck.name}</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>{date} · {deck.card_count} cards</p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button onClick={() => router.push(`/practice/${deckId}`)}
-              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors"
-              style={{ backgroundColor: "var(--accent)" }}>
-              Practice{dueToday > 0 ? ` (${dueToday} due)` : ""}
-            </button>
-            <button onClick={handleDelete} disabled={isDeleting}
-              className="rounded-xl px-4 py-2.5 text-sm font-medium transition-colors"
-              style={{ color: "var(--danger)" }}>
-              {isDeleting ? "Deleting..." : "Delete deck"}
-            </button>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: "var(--text-primary)" }}>{deck.name}</h1>
+              <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>{date} · {deck.card_count} cards</p>
+            </div>
+            <div className="flex flex-wrap gap-2.5">
+              <button onClick={() => router.push(`/practice/${deckId}`)}
+                className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+                style={{ backgroundColor: "var(--accent)" }}>
+                Practice{dueToday > 0 ? ` (${dueToday} due)` : ""}
+              </button>
+              <button onClick={() => router.push(`/quiz/${deckId}`)}
+                className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+                style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}>
+                🧠 Take Quiz
+              </button>
+              <button 
+                onClick={() => setShowRegenModal(true)}
+                disabled={deck.regenerate_count! >= 10}
+                className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+                style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}>
+                🔄 New Cards
+              </button>
+              <button onClick={handleDelete} disabled={isDeleting}
+                className="rounded-xl px-4 py-2.5 text-sm font-medium transition-colors"
+                style={{ color: "var(--danger)" }}>
+                {isDeleting ? "Deleting..." : "Delete deck"}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -132,20 +184,53 @@ export default function DeckPage({ params }: { params: { id: string } }) {
               </div>
 
               {/* Segmented progress bar — inline styles only */}
-              <div style={{ display: "flex", height: 12, borderRadius: 999, overflow: "hidden", background: "#e5e5f0" }}>
-                <div style={{ width: `${mp}%`, background: "#22c55e", transition: "width 0.5s" }} />
-                <div style={{ width: `${lp}%`, background: "#f59e0b", transition: "width 0.5s" }} />
-                <div style={{ width: `${np}%`, background: "#d1d5db", transition: "width 0.5s" }} />
+              <div style={{ display: "flex", height: 12, borderRadius: 999, overflow: "hidden", background: "#2a2a3a" }}>
+                <div style={{ width: `${mp}%`, background: "#22c55e", transition: "width 0.6s" }} />
+                <div style={{ width: `${lp}%`, background: "#f59e0b", transition: "width 0.6s" }} />
+                <div style={{ width: `${np}%`, background: "#6b7280", transition: "width 0.6s" }} />
               </div>
 
               <div className="mt-3 flex items-center gap-5 text-xs" style={{ color: "var(--text-secondary)" }}>
-                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#22c55e" }} />{mastered} Mastered</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />{learning} Learning</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#d1d5db" }} />{newCards} New</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#22c55e" }} />{masteredCount} Mastered</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />{learningCount} Learning</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#6b7280" }} />{newCount} New</span>
               </div>
             </div>
           )}
         </div>
+
+        {/* Card History collapsible section */}
+        {history.length > 0 && (
+          <div className="mt-8 border-t pt-6 animate-fade-up animate-delay-150" style={{ borderColor: "var(--border)" }}>
+            <h2 className="mb-4 text-[11px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-secondary)" }}>
+              📚 Card History ({history.length} generations)
+            </h2>
+            <div className="space-y-3">
+              {history.map((h) => (
+                <div key={h.id} className="rounded-xl overflow-hidden border" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
+                  <button 
+                    onClick={() => setExpandedHistory(expandedHistory === h.id ? null : h.id)}
+                    className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-medium transition-colors hover:bg-gray-50/50 dark:hover:bg-white/5"
+                    style={{ color: "var(--text-primary)" }}
+                  >
+                    <span>Generation {h.generation_number} — saved {new Date(h.saved_at).toLocaleDateString()}</span>
+                    <span style={{ color: "var(--text-secondary)" }}>{h.cards.length} cards {expandedHistory === h.id ? "↑" : "↓"}</span>
+                  </button>
+                  {expandedHistory === h.id && (
+                    <div className="px-5 pb-5 pt-2 space-y-3 max-h-[400px] overflow-y-auto animate-fade-in border-t" style={{ borderColor: "var(--border)" }}>
+                      {h.cards.map((c, idx) => (
+                        <div key={idx} className="text-xs p-3 rounded-lg" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
+                          <p className="font-bold mb-1" style={{ color: "var(--text-primary)" }}>Q: {c.question}</p>
+                          <p>A: {c.answer}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Cards list */}
         <div className="mt-10 border-t pt-6 animate-fade-up animate-delay-200" style={{ borderColor: "var(--border)" }}>
@@ -187,6 +272,34 @@ export default function DeckPage({ params }: { params: { id: string } }) {
           )}
         </div>
       </main>
+
+      {/* Regeneration Modal */}
+      {showRegenModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm rounded-[24px] p-8 animate-bounce-in shadow-2xl" style={{ perspective: "1000px", background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>Generate 50 new cards?</h2>
+            <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+              Your current cards will be saved to history. This will reset your progress for this deck.<br/><br/>
+              <strong>({deck.regenerate_count || 0}/10 regenerations used)</strong>
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowRegenModal(false)}
+                className="flex-1 rounded-xl py-3 text-sm font-semibold transition-colors"
+                style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>
+                Cancel
+              </button>
+              <button 
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                className="flex-1 rounded-xl py-3 text-sm font-bold text-white transition-colors"
+                style={{ backgroundColor: "var(--accent)" }}>
+                {isRegenerating ? "Generating..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

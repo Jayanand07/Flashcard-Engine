@@ -79,11 +79,18 @@ export default function DeckCard({ deck, onDeleted }: DeckCardProps) {
         <span style={{ color: "var(--text-secondary)" }}>{stats.newCards} new</span>
       </div>
 
-      <Link href={`/practice/${deck.id}`}
-        className="mt-5 flex items-center justify-center rounded-xl py-2.5 text-sm font-semibold text-white transition-colors"
-        style={{ backgroundColor: "var(--accent)" }}>
-        Start Practice{due > 0 ? ` (${due} due)` : ""}
-      </Link>
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Link href={`/practice/${deck.id}`}
+          className="flex items-center justify-center rounded-xl py-2.5 text-sm font-semibold text-white transition-colors"
+          style={{ backgroundColor: "var(--accent)" }}>
+          Practice{due > 0 ? ` (${due})` : ""}
+        </Link>
+        <Link href={`/quiz/${deck.id}`}
+          className="flex items-center justify-center rounded-xl py-2.5 text-sm font-semibold transition-colors"
+          style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}>
+          Take Quiz
+        </Link>
+      </div>
       <Link href={`/deck/${deck.id}`} className="mt-2 block text-center text-xs font-medium transition-colors" style={{ color: "var(--text-secondary)" }}>
         View all cards →
       </Link>
