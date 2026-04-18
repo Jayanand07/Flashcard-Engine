@@ -35,6 +35,7 @@ export default function QuizPage({ params }: { params: { id: string } }) {
   const [showCompletion, setShowCompletion] = useState(false);
   const [deckName, setDeckName] = useState("");
   const [expandedResult, setExpandedResult] = useState<number | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -56,6 +57,28 @@ export default function QuizPage({ params }: { params: { id: string } }) {
       }
     })();
   }, [deckId]);
+
+  const generateMissingQuiz = async () => {
+    setIsGenerating(true);
+    try {
+      const res = await fetch("/api/mcq/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deck_id: deckId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMcqs(data.mcqs);
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to generate quiz.");
+      }
+    } catch (error) {
+      alert("Failed to generate quiz.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -144,10 +167,20 @@ export default function QuizPage({ params }: { params: { id: string } }) {
   );
 
   if (mcqs.length === 0) return (
-    <div className="flex min-h-screen items-center justify-center" style={{ backgroundColor: "var(--bg)" }}>
-      <div className="text-center">
-        <p style={{ color: "var(--text-secondary)" }}>No quiz available for this deck.</p>
-        <Link href={`/deck/${deckId}`} className="mt-4 inline-block text-sm font-bold" style={{ color: "var(--accent)" }}>← Back to Deck</Link>
+    <div className="flex min-h-screen flex-col items-center justify-center px-4 text-center" style={{ backgroundColor: "var(--bg)" }}>
+      <div className="rounded-[32px] p-8 max-w-sm w-full animate-fade-up" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <p className="mb-6 font-bold" style={{ color: "var(--text-primary)" }}>No quiz available for this deck yet.</p>
+        <button 
+          onClick={generateMissingQuiz} 
+          disabled={isGenerating}
+          className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all disabled:opacity-50"
+          style={{ backgroundColor: "var(--accent)" }}
+        >
+          {isGenerating ? "Generating Quiz..." : "✨ Generate Quiz Now"}
+        </button>
+        <Link href={`/deck/${deckId}`} className="mt-4 block text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
+          ← Back to Deck
+        </Link>
       </div>
     </div>
   );

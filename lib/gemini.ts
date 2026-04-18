@@ -72,10 +72,11 @@ ${trimmedText}`;
 }
 
 export async function generateMCQs(
-  topic: string
+  content: string
 ): Promise<Array<{ question: string; options: string[]; correct_index: number; explanation: string }>> {
+  const trimmedText = content.substring(0, 30000);
   const prompt = `You are an expert teacher creating a quiz.
-Generate exactly 20 multiple choice questions about: ${topic}
+Analyze the following content deeply and generate exactly 20 multiple choice questions.
 
 Rules:
 - 4 options each (A, B, C, D)
@@ -91,7 +92,10 @@ Return ONLY valid JSON array:
   "options": ["string", "string", "string", "string"],
   "correct_index": number (0-3),
   "explanation": "string"
-}]`;
+}]
+
+Content to analyze:
+${trimmedText}`;
 
   try {
     const result = await model.generateContent(prompt);

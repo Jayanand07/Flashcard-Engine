@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
     // New Step: Generate MCQs
     let mcqs;
     try {
-      mcqs = await generateMCQs(name);
-      console.log(`Successfully generated ${mcqs.length} MCQs.`);
+      mcqs = await generateMCQs(extractedText);
+      console.log(`Successfully generated ${mcqs?.length || 0} MCQs.`);
     } catch (mcqError) {
       console.error("Gemini MCQ generation failed:", mcqError);
       // We don't fail the whole process if MCQs fail, but we'll try to insert them only if they exist

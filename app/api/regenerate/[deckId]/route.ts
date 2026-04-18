@@ -37,10 +37,13 @@ export async function POST(
     await supabase.from("mcqs").delete().eq("deck_id", deckId);
 
     // 4. Generate NEW cards and MCQs
-    // Use deck name as topic for regeneration
+    // Use deck name and previous flashcards as context for regeneration
+    const contentContext = `Topic: ${deck.name}\n\nContext based on previous cards:\n` + 
+      (currentCards?.map(c => `Q: ${c.question}\nA: ${c.answer}`).join('\n') || deck.name);
+
     const [newFlashcards, newMCQs] = await Promise.all([
-      generateFlashcards(`Generate 50 completely NEW and DIFFERENT flashcards about: ${deck.name}. These must be different from common knowledge — cover advanced concepts, edge cases, real examples.`),
-      generateMCQs(deck.name)
+      generateFlashcards(`Generate 50 completely NEW and DIFFERENT flashcards about: ${deck.name}. These must be different from common knowledge — cover advanced concepts, edge cases, real examples.\n\nContext:\n${contentContext}`),
+      generateMCQs(contentContext)
     ]);
 
     // 5. Save new cards
