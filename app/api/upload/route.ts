@@ -53,11 +53,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "PDF contains too little text to process" }, { status: 400 });
     }
 
-    // 3. Generate both Flashcards and MCQs in parallel
-    const [flashcards, mcqs] = await Promise.all([
-      generateFlashcards(extractedText),
-      generateMCQs(extractedText)
-    ]);
+    // Fix 3: Truncate PDF text to stay within context window
+    const truncatedText = extractedText.slice(0, 10000);
+
+    // 3. Generate both Flashcards and MCQs in parallel with Fix 6 (Try-Catch)
+    let flashcards, mcqs;
+    try {
+      const results = await Promise.all([
+        generateFlashcards(truncatedText),
+        generateMCQs(truncatedText)
+      ]);
+      flashcards = results[0];
+      mcqs = results[1];
+    } catch (err) {
+      console.error("[api/upload/Generation]", err);
+      // Delete the empty deck we created if generation fails
+      await supabase.from(SUPABASE_TABLES.DECKS).delete().eq("id", deck.id);
+      return NextResponse.json(
+        { error: err instanceof Error ? err.message : "Generation failed" },
+        { status: 500 }
+      );
+    }
 
     // 4. Insert Flashcards
     const cardsToInsert = flashcards.map((c: { question: string, answer: string }) => ({
@@ -66,7 +82,7 @@ export async function POST(req: Request) {
       question: c.question,
       answer: c.answer,
       difficulty: 'new',
-      interval: 1, // Start with 1, not 0
+      interval: 1,
       ease_factor: 2.5,
       next_review: getTodayString()
     }));

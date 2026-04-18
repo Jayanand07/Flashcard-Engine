@@ -5,15 +5,27 @@ const apiKey = process.env.GEMINI_API_KEY!;
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
-const extractJSON = (text: string): string => {
-  const firstBracket = text.indexOf("[");
-  const lastBracket = text.lastIndexOf("]");
+const parseGeminiJSON = (text: string) => {
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
   
-  if (firstBracket === -1 || lastBracket === -1) {
+  if (start === -1 || end === -1) {
     throw new Error("No JSON array found in AI response");
   }
   
-  return text.slice(firstBracket, lastBracket + 1);
+  let jsonStr = text.slice(start, end + 1);
+  
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    // Attempt to fix escape characters and control characters
+    jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, " ");
+    try {
+      return JSON.parse(jsonStr);
+    } catch {
+      throw new Error("JSON parse failed even after sanitization");
+    }
+  }
 };
 
 const validateItems = (parsed: any, requiredFields: string[]): any[] => {
@@ -33,29 +45,25 @@ export async function generateFlashcards(
 20 years of experience creating study materials.
 
 Analyze the following content deeply and generate 
-exactly 50 flashcards that would help a student 
-truly MASTER this material — not just memorize it.
+exactly 20 flashcards that would help a student 
+truly MASTER this material.
+
+CRITICAL: Return ONLY raw JSON array.
+No markdown, no backticks, no explanation.
+Keep all answers under 80 words.
+Never use double quotes inside text values.
 
 MANDATORY card type distribution:
-- 10 cards: Core concept definitions 
-- 10 cards: Deep understanding (Why/How questions)
-- 8 cards: Relationships and comparisons
-- 8 cards: Real-world application with examples
-- 7 cards: Edge cases and exceptions
-- 7 cards: Cause and effect
-- 5 cards: Synthesis (how X Y Z work together)
-- 5 cards: Misconception busters
+- 4 cards: Core concept definitions 
+- 4 cards: Deep understanding (Why/How questions)
+- 3 cards: Relationships and comparisons
+- 3 cards: Real-world application with examples
+- 2 cards: Edge cases and exceptions
+- 2 cards: Cause and effect
+- 1 card: Synthesis
+- 1 card: Misconception busters
 
-STRICT QUALITY RULES:
-- Every question answerable WITHOUT the PDF
-- Every answer self-contained (2-4 sentences max)
-- No two cards test the same concept
-- Questions must be specific, never vague
-- Include actual examples from the content
-- Write like a great teacher, not a bot
-- Vary question types across all 50
-
-Return ONLY valid JSON, no markdown, no backticks:
+Return exactly 20 cards in this format:
 [{"question": "...", "answer": "..."}]
 
 Content:
@@ -66,8 +74,7 @@ ${trimmedText}`;
     const response = await result.response;
     const text = response.text();
 
-    const jsonText = extractJSON(text);
-    const parsed = JSON.parse(jsonText);
+    const parsed = parseGeminiJSON(text);
     const validated = validateItems(parsed, ["question", "answer"]);
     
     if (validated.length === 0) throw new Error("No valid flashcards generated");
@@ -87,18 +94,20 @@ export async function generateMCQs(
   const prompt = `You are an expert teacher creating 
 a high-quality quiz about the following content.
 
-Generate exactly 20 multiple choice questions.
+Generate exactly 10 MCQ questions.
+
+CRITICAL: Return ONLY raw JSON array.
+No markdown, no backticks, no explanation.
+Keep all explanations under 80 words.
+Never use double quotes inside text values.
 
 Rules:
 - 4 options per question (A, B, C, D)
 - Options must ALL be plausible (not obviously wrong)
 - Exactly 1 correct answer per question
 - Difficulty mix: 25% easy, 50% medium, 25% hard
-- Cover different aspects — no repeated concepts
-- Explanation must be 2-3 sentences, teach the WHY
-- Questions test understanding, not just memory
 
-Return ONLY valid JSON array, no markdown:
+Format:
 [{
   "question": "...",
   "options": ["...", "...", "...", "..."],
@@ -114,8 +123,7 @@ ${trimmedText}`;
     const response = await result.response;
     const text = response.text();
 
-    const jsonText = extractJSON(text);
-    const parsed = JSON.parse(jsonText);
+    const parsed = parseGeminiJSON(text);
     const validated = validateItems(parsed, ["question", "options", "correct_index", "explanation"]);
     
     if (validated.length === 0) throw new Error("No valid MCQs generated");

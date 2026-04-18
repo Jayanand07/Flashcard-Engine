@@ -64,8 +64,13 @@ export default function UploadModal({ isOpen, onClose, onSuccess }: UploadModalP
       setTimeout(() => setCurrentStep("generating"), 1200);
 
       const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        throw new Error(`Server error: ${text}`);
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to generate flashcards");
+      if (!res.ok) throw new Error(data.error || "Upload failed");
 
       setCurrentStep("saving");
       await new Promise((r) => setTimeout(r, 600));
