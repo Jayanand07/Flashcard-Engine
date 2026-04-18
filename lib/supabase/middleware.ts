@@ -33,18 +33,9 @@ export async function updateSession(request: NextRequest) {
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login')
 
-  const isProtectedPath = 
-    request.nextUrl.pathname === '/' || 
-    request.nextUrl.pathname.startsWith('/practice') || 
-    request.nextUrl.pathname.startsWith('/quiz') || 
-    request.nextUrl.pathname.startsWith('/deck');
-
-  if (!user && isProtectedPath) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/login'
-    return NextResponse.redirect(url)
-  }
-
+  // We allow public access to almost everything for frictionless "Guest" experience.
+  // RLS will handle the data filtering based on the anonymous session.
+  
   if (user && isAuthPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/'

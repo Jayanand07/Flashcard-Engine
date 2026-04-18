@@ -11,22 +11,41 @@ interface NavbarProps { onUploadClick?: () => void; }
 export default function Navbar({ onUploadClick }: NavbarProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
     setMounted(true);
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUserEmail(user.email || 'Guest');
+    // Listen for auth changes to keep navbar in sync
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
     });
-  }, []);
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    router.refresh();
+  };
+
+  const handleSignIn = () => {
     router.push('/login');
   };
+
+  const truncateEmail = (email: string) => {
+    if (!email) return "";
+    return email.length > 20 ? email.substring(0, 17) + "..." : email;
+  };
+
+  const isAnonymous = user?.is_anonymous || false;
+  const userIdentifier = user?.email || "Guest";
 
   return (
     <nav className="navbar-gradient-border sticky top-0 z-50 backdrop-blur-xl"
@@ -45,11 +64,11 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
           </Link>
         </div>
 
-        {/* Right: toggle + upload */}
-        <div className="flex items-center gap-2.5">
+        {/* Right: toggle + user + upload */}
+        <div className="flex items-center gap-3">
           {mounted && (
             <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
               style={{ color: "var(--text-secondary)" }}
               aria-label="Toggle theme">
               {theme === "dark" ? (
@@ -59,14 +78,37 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
               )}
             </button>
           )}
-          {userEmail && (
-            <button onClick={handleLogout} className="text-[11px] font-bold tracking-wide mr-2" style={{ color: "var(--text-secondary)" }}>
-              Logout
-            </button>
+
+          {mounted && user && (
+            <div className="flex items-center gap-3 border-l pl-3" style={{ borderColor: "var(--border)" }}>
+              {isAnonymous ? (
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-gray-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border border-gray-500/20">
+                    👤 Guest
+                  </span>
+                  <button onClick={handleSignIn} className="text-xs font-bold transition-opacity hover:opacity-70" style={{ color: "var(--text-secondary)" }}>
+                    Sign in
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold text-white shadow-sm" style={{ backgroundColor: "#7c6af7" }}>
+                    {userIdentifier[0].toUpperCase()}
+                  </div>
+                  <span className="hidden text-xs font-medium sm:block" style={{ color: "var(--text-secondary)" }}>
+                    {truncateEmail(userIdentifier)}
+                  </span>
+                  <button onClick={handleLogout} className="text-xs font-bold transition-opacity hover:opacity-70" style={{ color: "var(--text-secondary)" }}>
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           )}
+
           {onUploadClick && (
             <button onClick={onUploadClick}
-              className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors"
+              className="rounded-xl px-4 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-[0.98]"
               style={{ backgroundColor: "var(--accent)" }}>
               Upload PDF
             </button>

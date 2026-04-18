@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import { createClient } from "@/lib/supabase/client";
 import confetti from "canvas-confetti";
 
 interface MCQ {
@@ -36,27 +37,37 @@ export default function QuizPage({ params }: { params: { id: string } }) {
   const [deckName, setDeckName] = useState("");
   const [expandedResult, setExpandedResult] = useState<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [showMigrateBanner, setShowMigrateBanner] = useState(true);
+  const supabase = createClient();
 
   useEffect(() => {
     (async () => {
       try {
         const [mcqRes, deckRes] = await Promise.all([
           fetch(`/api/mcq?deck_id=${deckId}`),
-          (await import("@/lib/supabase")).supabase.from("decks").select("name").eq("id", deckId).single()
+          fetch(`/api/decks/${deckId}`)
         ]);
         
         if (mcqRes.ok) {
           const data = await mcqRes.json();
           setMcqs(data);
         }
-        if (deckRes.data) setDeckName(deckRes.data.name);
+        if (deckRes.ok) {
+          const data = await deckRes.json();
+          setDeckName(data.deck?.name || "Unknown Deck");
+        }
       } catch (err) {
         console.error("Failed to fetch quiz data:", err);
       } finally {
         setLoading(false);
       }
     })();
-  }, [deckId]);
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+  }, [deckId, supabase]);
 
   const generateMissingQuiz = async () => {
     setIsGenerating(true);
@@ -166,25 +177,6 @@ export default function QuizPage({ params }: { params: { id: string } }) {
     </div>
   );
 
-  if (mcqs.length === 0) return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4 text-center" style={{ backgroundColor: "var(--bg)" }}>
-      <div className="rounded-[32px] p-8 max-w-sm w-full animate-fade-up" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-        <p className="mb-6 font-bold" style={{ color: "var(--text-primary)" }}>No quiz available for this deck yet.</p>
-        <button 
-          onClick={generateMissingQuiz} 
-          disabled={isGenerating}
-          className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all disabled:opacity-50"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          {isGenerating ? "Generating Quiz..." : "✨ Generate Quiz Now"}
-        </button>
-        <Link href={`/deck/${deckId}`} className="mt-4 block text-sm font-semibold" style={{ color: "var(--text-secondary)" }}>
-          ← Back to Deck
-        </Link>
-      </div>
-    </div>
-  );
-
   if (showCompletion) {
     const accuracy = Math.round((score / mcqs.length) * 100);
     const feedback = accuracy >= 80 ? { text: "Excellent! 🏆", color: "var(--success)" } : 
@@ -213,6 +205,53 @@ export default function QuizPage({ params }: { params: { id: string } }) {
               <button onClick={() => window.location.reload()} className="flex-1 rounded-xl py-3.5 text-sm font-bold text-white" style={{ backgroundColor: "var(--accent)" }}>Try Again</button>
               <button onClick={() => router.push(`/deck/${deckId}`)} className="flex-1 rounded-xl py-3.5 text-sm font-bold" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>Back to Deck</button>
             </div>
+
+            {user?.is_anonymous && showMigrateBanner && (
+              <div style={{
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '12px 20px',
+                marginTop: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+                position: 'relative'
+              }}>
+                <span style={{fontSize:'13px', color:'var(--text-secondary)', textAlign: 'left'}}>
+                  💾 Sign in with Google to save your progress permanently
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button onClick={() => router.push('/login')} style={{
+                    background: '#7c6af7',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    Sign in →
+                  </button>
+                  <button 
+                    onClick={() => setShowMigrateBanner(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      fontSize: '18px',
+                      padding: '4px'
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-12">
@@ -281,60 +320,75 @@ export default function QuizPage({ params }: { params: { id: string } }) {
       </div>
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 flex flex-col items-center justify-center">
-        <div className="w-full animate-fade-up" key={currentIndex}>
-          <div className="text-center mb-10">
-            <span className="inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "var(--surface-2)", color: "var(--accent)" }}>Question {currentIndex + 1}</span>
-            <h2 className="text-2xl sm:text-3xl font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{currentMCQ.question}</h2>
-          </div>
+        {mcqs.length > 0 ? (
+          <div className="w-full animate-fade-up" key={currentIndex}>
+            <div className="text-center mb-10">
+              <span className="inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "var(--surface-2)", color: "var(--accent)" }}>Question {currentIndex + 1}</span>
+              <h2 className="text-2xl sm:text-3xl font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{currentMCQ.question}</h2>
+            </div>
 
-          <div className="grid gap-3 w-full">
-            {currentMCQ.options.map((option, i) => {
-              const isSelected = selectedOption === i;
-              const isCorrect = i === currentMCQ.correct_index;
-              const showCorrect = showFeedback && isCorrect;
-              const showWrong = showFeedback && isSelected && !isCorrect;
+            <div className="grid gap-3 w-full">
+              {currentMCQ.options.map((option, i) => {
+                const isSelected = selectedOption === i;
+                const isCorrect = i === currentMCQ.correct_index;
+                const showFeedback = selectedOption !== null;
+                const showCorrect = showFeedback && isCorrect;
+                const showWrong = showFeedback && isSelected && !isCorrect;
 
-              return (
-                <button
-                  key={i}
-                  disabled={showFeedback}
-                  onClick={(e) => handleOptionSelect(i, e)}
-                  className={`w-full flex items-center gap-4 rounded-2xl p-5 text-left text-sm font-medium border transition-all ${!showFeedback ? "hover:scale-[1.01] hover:border-violet-400" : ""} ${showCorrect ? "scale-[1.02]" : ""} ${showWrong ? "animate-shake" : ""}`}
-                  style={{
-                    background: showCorrect ? "#dcfce7" : showWrong ? "#fee2e2" : "var(--surface)",
-                    borderColor: showCorrect ? "#22c55e" : showWrong ? "#ef4444" : "var(--border)",
-                    color: (showCorrect || showWrong) ? "#0a0a0f" : "var(--text-primary)"
-                  }}
-                >
-                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold border transition-colors ${isSelected ? "bg-violet-600 text-white border-violet-600" : "border-gray-200"}`}>
-                    {String.fromCharCode(65 + i)}
-                  </span>
-                  <span className="flex-1">{option}</span>
-                  {showCorrect && <span className="text-green-600 font-bold">✓ Correct!</span>}
-                  {showWrong && <span className="text-red-600 font-bold">✕ Wrong</span>}
+                return (
+                  <button
+                    key={i}
+                    disabled={showFeedback}
+                    onClick={(e) => handleOptionSelect(i, e)}
+                    className={`w-full flex items-center gap-4 rounded-2xl p-5 text-left text-sm font-medium border transition-all ${!showFeedback ? "hover:scale-[1.01] hover:border-violet-400" : ""} ${showCorrect ? "scale-[1.02]" : ""} ${showWrong ? "animate-shake" : ""}`}
+                    style={{
+                      background: showCorrect ? "#dcfce7" : showWrong ? "#fee2e2" : "var(--surface)",
+                      borderColor: showCorrect ? "#22c55e" : showWrong ? "#ef4444" : "var(--border)",
+                      color: (showCorrect || showWrong) ? "#0a0a0f" : "var(--text-primary)"
+                    }}
+                  >
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold border transition-colors ${isSelected ? "bg-violet-600 text-white border-violet-600" : "border-gray-200"}`}>
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="flex-1">{option}</span>
+                    {showCorrect && <span className="text-green-600 font-bold">✓ Correct!</span>}
+                    {showWrong && <span className="text-red-600 font-bold">✕ Wrong</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {showFeedback && (
+              <div className="mt-8 animate-fade-up">
+                <div className={`rounded-2xl p-6 border ${selectedOption === currentMCQ.correct_index ? "border-green-200 bg-green-50 dark:bg-green-900/10" : "border-red-200 bg-red-50 dark:bg-red-900/10"}`}>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: selectedOption === currentMCQ.correct_index ? "#166534" : "#991b1b" }}>💡 Explanation</p>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{currentMCQ.explanation}</p>
+                </div>
+                <button onClick={nextQuestion} className="mt-6 w-full rounded-2xl py-4 text-sm font-bold text-white shadow-lg transition-transform active:scale-[0.98]" style={{ backgroundColor: "var(--accent)" }}>
+                  {currentIndex + 1 === mcqs.length ? "Finish Quiz" : "Next Question →"}
                 </button>
-              );
-            })}
-          </div>
-
-          {showFeedback && (
-            <div className="mt-8 animate-fade-up">
-              <div className={`rounded-2xl p-6 border ${selectedOption === currentMCQ.correct_index ? "border-green-200 bg-green-50 dark:bg-green-900/10" : "border-red-200 bg-red-50 dark:bg-red-900/10"}`}>
-                <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: selectedOption === currentMCQ.correct_index ? "#166534" : "#991b1b" }}>💡 Explanation</p>
-                <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{currentMCQ.explanation}</p>
               </div>
-              <button onClick={nextQuestion} className="mt-6 w-full rounded-2xl py-4 text-sm font-bold text-white shadow-lg transition-transform active:scale-[0.98]" style={{ backgroundColor: "var(--accent)" }}>
-                {currentIndex + 1 === mcqs.length ? "Finish Quiz" : "Next Question →"}
-              </button>
-            </div>
-          )}
-          
-          {!showCompletion && (
-            <div className="mt-8 text-center text-[11px] font-medium tracking-wide" style={{ color: "var(--text-secondary)" }}>
-              {showFeedback ? "SPACE / ENTER for next" : "1-4 to answer"}
-            </div>
-          )}
-        </div>
+            )}
+            
+            {!showCompletion && (
+              <div className="mt-8 text-center text-[11px] font-medium tracking-wide" style={{ color: "var(--text-secondary)" }}>
+                {showFeedback ? "SPACE / ENTER for next" : "1-4 to answer"}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className="mb-6 font-bold" style={{ color: "var(--text-primary)" }}>No quiz available for this deck yet.</p>
+            <button 
+              onClick={generateMissingQuiz} 
+              disabled={isGenerating}
+              className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all disabled:opacity-50"
+              style={{ backgroundColor: "var(--accent)" }}
+            >
+              {isGenerating ? "Generating Quiz..." : "✨ Generate Quiz Now"}
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

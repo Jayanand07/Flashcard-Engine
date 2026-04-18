@@ -11,16 +11,28 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
+    if (error) {
+      console.error(error);
+      setLoading(false);
+      alert("Failed to initiate Google login");
+    }
   };
 
   const handleGuestLogin = async () => {
     setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
+      router.push("/");
+      return;
+    }
+
     const { error } = await supabase.auth.signInAnonymously();
     if (!error) {
       router.push("/");
@@ -41,14 +53,17 @@ export default function LoginPage() {
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-40 h-40 rounded-full blur-3xl opacity-30" style={{ background: "linear-gradient(135deg, #7c6af7, #a855f7)" }} />
         
         <div className="relative z-10">
-          <h1 className="text-3xl font-black mb-2" style={{ color: "var(--text-primary)" }}>FlashCard Engine</h1>
-          <p className="text-sm mb-10" style={{ color: "var(--text-secondary)" }}>Master any topic using spaced repetition.</p>
+          <div className="mb-6 flex justify-center">
+            <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-500/10 text-3xl shadow-inner border border-violet-500/20">⚡</span>
+          </div>
+          <h1 className="text-3xl font-black mb-2 tracking-tight" style={{ color: "var(--text-primary)" }}>FlashCard Engine</h1>
+          <p className="text-sm mb-10 font-medium" style={{ color: "var(--text-secondary)" }}>Master any topic using intelligent spaced repetition.</p>
 
           <div className="space-y-4">
             <button 
               onClick={handleGoogleLogin} 
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 rounded-2xl py-4 text-sm font-bold shadow-sm transition-transform active:scale-[0.98]"
+              className="w-full flex items-center justify-center gap-3 rounded-2xl py-4 text-sm font-bold shadow-sm transition-all hover:brightness-110 active:scale-[0.98]"
               style={{ background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -57,26 +72,27 @@ export default function LoginPage() {
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
-              Continue with Google
+              Sign in with Google
             </button>
 
             <div className="relative py-4">
               <div className="absolute inset-0 flex items-center"><div className="w-full border-t" style={{ borderColor: "var(--border)" }} /></div>
-              <div className="relative flex justify-center text-xs"><span className="px-4" style={{ background: "var(--surface)", color: "var(--text-secondary)" }}>OR</span></div>
+              <div className="relative flex justify-center text-[10px] font-bold uppercase tracking-widest"><span className="px-4" style={{ background: "var(--surface)", color: "var(--text-secondary)" }}>or continue friction-free</span></div>
             </div>
 
             <button 
               onClick={handleGuestLogin}
               disabled={loading}
-              className="w-full rounded-2xl py-4 text-sm font-bold text-white shadow-xl transition-all active:scale-[0.98]"
+              className="w-full rounded-2xl py-4 text-sm font-bold text-white shadow-xl transition-all hover:brightness-110 active:scale-[0.98]"
               style={{ background: "linear-gradient(135deg, var(--accent), #a855f7)", opacity: loading ? 0.7 : 1 }}
             >
-              Play as Guest
+              Continue as Guest →
             </button>
           </div>
           
-          <p className="mt-8 text-[11px]" style={{ color: "var(--text-secondary)" }}>
-            By continuing, you agree to our Terms of Service and Privacy Policy. Guest data may be cleared when cookies are reset.
+          <p className="mt-8 text-[11px] leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+            By continuing, you agree to our Terms of Service and Privacy Policy.<br/>
+            <span className="opacity-70">Guest data is stored locally and may be cleared if cookies are reset.</span>
           </p>
         </div>
       </div>

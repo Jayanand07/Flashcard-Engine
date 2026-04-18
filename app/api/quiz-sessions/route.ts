@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET() {
   try {
+    const supabase = createClient();
     const { data, error } = await supabase
       .from("quiz_sessions")
       .select("*")
@@ -21,6 +22,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { deck_id, deck_name, score, total_questions, accuracy } = body;
 
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { data, error } = await supabase
       .from("quiz_sessions")
       .insert({
@@ -29,6 +36,7 @@ export async function POST(req: NextRequest) {
         score,
         total_questions,
         accuracy,
+        user_id: user.id,
         completed_at: new Date().toISOString()
       })
       .select()

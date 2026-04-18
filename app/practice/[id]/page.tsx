@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import Flashcard from "@/components/Flashcard";
 import confetti from "canvas-confetti";
 
@@ -37,6 +38,9 @@ export default function PracticePage({ params }: { params: { id: string } }) {
   const [sessionStart] = useState(Date.now());
   const [streak, setStreak] = useState(0);
   const [showStreakBurst, setShowStreakBurst] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [showMigrateBanner, setShowMigrateBanner] = useState(true);
+  const supabase = createClient();
 
   const fetchCards = useCallback(async () => {
     setLoading(true);
@@ -64,7 +68,11 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         console.error("Failed to fetch deck name:", err);
       }
     })();
-  }, [deckId, fetchCards]);
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+  }, [deckId, fetchCards, supabase]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -209,7 +217,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         setTimeout(() => confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } }), 300);
       }
     } catch { alert("Error saving."); setIsSubmitting(false); setCardAnim(""); }
-  }, [isSubmitting, cards, currentIndex, hardCount, okayCount, easyCount, currentStreak, bestStreak, showCompletion, deckId, deckName]);
+  }, [isSubmitting, cards, currentIndex, hardCount, okayCount, easyCount, currentStreak, bestStreak, showCompletion, deckId, deckName, streak]);
 
   const handlePracticeAgain = async () => {
     setResetting(true);
@@ -320,6 +328,53 @@ export default function PracticePage({ params }: { params: { id: string } }) {
               Back to Deck
             </button>
           </div>
+
+          {user?.is_anonymous && showMigrateBanner && (
+            <div style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '12px 20px',
+              marginTop: '16px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              position: 'relative'
+            }}>
+              <span style={{fontSize:'13px', color:'var(--text-secondary)', textAlign: 'left'}}>
+                💾 Sign in with Google to save your progress permanently
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button onClick={() => router.push('/login')} style={{
+                  background: '#7c6af7',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '6px 14px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}>
+                  Sign in →
+                </button>
+                <button 
+                  onClick={() => setShowMigrateBanner(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontSize: '18px',
+                    padding: '4px'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
