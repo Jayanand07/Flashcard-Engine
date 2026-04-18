@@ -19,35 +19,27 @@ truly MASTER this material — not just memorize it.
 
 MANDATORY card type distribution:
 - 10 cards: Core concept definitions 
-  ("What is X?", "Define Y")
-- 10 cards: Deep understanding 
-  ("Why does X happen?", "How does X work?")
-- 8 cards: Relationships and comparisons 
-  ("How does X differ from Y?", "What connects X and Y?")
-- 8 cards: Real-world application 
-  ("Give an example of X in practice")
-- 7 cards: Edge cases and exceptions 
-  ("What happens when X fails?", "When does Y not apply?")
-- 7 cards: Cause and effect 
-  ("What causes X?", "What are consequences of Y?")
-- 5 cards: Synthesis questions 
-  ("Explain how X, Y, and Z work together")
-- 5 cards: Tricky misconception busters 
-  ("Why do people wrongly think X?")
+- 10 cards: Deep understanding (Why/How questions)
+- 8 cards: Relationships and comparisons
+- 8 cards: Real-world application with examples
+- 7 cards: Edge cases and exceptions
+- 7 cards: Cause and effect
+- 5 cards: Synthesis (how X Y Z work together)
+- 5 cards: Misconception busters
 
 STRICT QUALITY RULES:
-- Every question must be answerable WITHOUT the PDF
-- Every answer must be self-contained (2-4 sentences)
-- No two cards can test the same concept
+- Every question answerable WITHOUT the PDF
+- Every answer self-contained (2-4 sentences max)
+- No two cards test the same concept
 - Questions must be specific, never vague
-- Include actual numbers, names, examples from the content
-- Write like a great teacher explaining to a smart student
-- Vary sentence structure across all 50 questions
+- Include actual examples from the content
+- Write like a great teacher, not a bot
+- Vary question types across all 50
 
-Return ONLY a valid JSON array with NO markdown:
+Return ONLY valid JSON, no markdown, no backticks:
 [{"question": "...", "answer": "..."}]
 
-Content to analyze:
+Content:
 ${trimmedText}`;
 
   try {
@@ -75,23 +67,26 @@ export async function generateMCQs(
   content: string
 ): Promise<Array<{ question: string; options: string[]; correct_index: number; explanation: string }>> {
   const trimmedText = content.substring(0, 30000);
-  const prompt = `You are an expert teacher creating a quiz.
-Analyze the following content deeply and generate exactly 20 multiple choice questions.
+  const prompt = `You are an expert teacher creating 
+a high-quality quiz about the following content.
+
+Generate exactly 20 multiple choice questions.
 
 Rules:
-- 4 options each (A, B, C, D)
-- Exactly 1 correct answer
-- Options must be plausible (not obviously wrong)
-- Include a clear explanation for the correct answer
-- Vary difficulty: 30% easy, 50% medium, 20% hard
-- Cover different aspects of the topic
+- 4 options per question (A, B, C, D)
+- Options must ALL be plausible (not obviously wrong)
+- Exactly 1 correct answer per question
+- Difficulty mix: 25% easy, 50% medium, 25% hard
+- Cover different aspects — no repeated concepts
+- Explanation must be 2-3 sentences, teach the WHY
+- Questions test understanding, not just memory
 
-Return ONLY valid JSON array:
+Return ONLY valid JSON array, no markdown:
 [{
-  "question": "string",
-  "options": ["string", "string", "string", "string"],
-  "correct_index": number (0-3),
-  "explanation": "string"
+  "question": "...",
+  "options": ["...", "...", "...", "..."],
+  "correct_index": 0,
+  "explanation": "..."
 }]
 
 Content to analyze:
