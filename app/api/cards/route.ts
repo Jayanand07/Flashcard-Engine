@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { calculateSM2, getTodayString, Rating } from "@/lib/sm2";
 
 export async function GET(req: NextRequest) {
@@ -13,6 +13,8 @@ export async function GET(req: NextRequest) {
         { status: 400 }
       );
     }
+    
+    const supabase = createClient();
 
     let query = supabase.from("cards").select("*").eq("deck_id", deck_id);
 
@@ -98,6 +100,8 @@ export async function PATCH(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const supabase = createClient();
 
     // Validate rating enum
     const validRatings = ["hard", "okay", "easy"];

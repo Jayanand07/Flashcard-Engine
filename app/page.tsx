@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 import { getTodayString } from "@/lib/sm2";
 import Navbar from "@/components/Navbar";
 import DeckCard from "@/components/DeckCard";
@@ -25,6 +25,7 @@ export default function Dashboard() {
   const [lastDeckId, setLastDeckId] = useState<string | null>(null);
   const [lastDeckName, setLastDeckName] = useState<string | null>(null);
   const router = useRouter();
+  const supabase = createClient();
 
   const fetchDecks = async () => {
     setLoading(true);

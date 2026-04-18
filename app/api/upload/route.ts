@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { generateFlashcards, generateMCQs } from "@/lib/gemini";
 import { getTodayString } from "@/lib/sm2";
 export async function POST(req: NextRequest) {
@@ -49,10 +49,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Step 4 - Save deck to Supabase
+    // Step 4 - Get User & Save deck to Supabase
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized. Please log in." }, { status: 401 });
+    }
+
     const { data: deck, error: deckError } = await supabase
       .from("decks")
-      .insert({ name: name, card_count: flashcards.length })
+      .insert({ name: name, card_count: flashcards.length, user_id: user.id })
       .select()
       .single();
 
@@ -85,6 +92,7 @@ export async function POST(req: NextRequest) {
         next_review: today,
         interval: 1,
         ease_factor: 2.5,
+        user_id: user.id,
       })
     );
 
@@ -103,7 +111,8 @@ export async function POST(req: NextRequest) {
         question: m.question,
         options: m.options,
         correct_index: m.correct_index,
-        explanation: m.explanation
+        explanation: m.explanation,
+        user_id: user.id
       }));
       const { error: mcqsError } = await supabase.from("mcqs").insert(mcqsArray);
       if (mcqsError) console.error("Failed to insert MCQs:", mcqsError.message);

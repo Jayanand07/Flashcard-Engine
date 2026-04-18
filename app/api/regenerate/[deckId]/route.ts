@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 import { generateFlashcards, generateMCQs } from "@/lib/gemini";
 import { getTodayString } from "@/lib/sm2";
 
@@ -9,6 +9,12 @@ export async function POST(
 ) {
   try {
     const deckId = params.deckId;
+
+    const supabase = createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     // 1. Fetch deck and check regenerate count
     const { data: deck, error: deckError } = await supabase
@@ -56,6 +62,7 @@ export async function POST(
       next_review: today,
       interval: 1,
       ease_factor: 2.5,
+      user_id: user.id
     }));
     await supabase.from("cards").insert(cardsArray);
 
@@ -65,7 +72,8 @@ export async function POST(
       question: m.question,
       options: m.options,
       correct_index: m.correct_index,
-      explanation: m.explanation
+      explanation: m.explanation,
+      user_id: user.id
     }));
     await supabase.from("mcqs").insert(mcqsArray);
 

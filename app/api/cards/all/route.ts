@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
     if (!deckId) {
       return NextResponse.json({ error: "deckId is required" }, { status: 400 });
     }
+
+    const supabase = createClient();
 
     const { data: cards, error } = await supabase
       .from("cards")

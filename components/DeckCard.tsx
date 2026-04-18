@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 interface DeckCardProps {
   deck: {
@@ -39,6 +39,7 @@ export default function DeckCard({ deck, onDeleted }: DeckCardProps) {
   const handleDelete = async () => {
     if (!confirm("Delete this deck?")) return;
     setDeleting(true);
+    const supabase = createClient();
     const { error } = await supabase.from("decks").delete().eq("id", deck.id);
     if (!error) onDeleted(); else { alert("Failed"); setDeleting(false); }
   };

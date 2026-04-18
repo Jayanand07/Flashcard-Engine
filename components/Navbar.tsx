@@ -2,16 +2,31 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { createClient } from "@/lib/supabase/client";
 
 interface NavbarProps { onUploadClick?: () => void; }
 
 export default function Navbar({ onUploadClick }: NavbarProps) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const pathname = usePathname();
-  useEffect(() => setMounted(true), []);
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    setMounted(true);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserEmail(user.email || 'Guest');
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   return (
     <nav className="navbar-gradient-border sticky top-0 z-50 backdrop-blur-xl"
@@ -42,6 +57,11 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
               ) : (
                 <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               )}
+            </button>
+          )}
+          {userEmail && (
+            <button onClick={handleLogout} className="text-[11px] font-bold tracking-wide mr-2" style={{ color: "var(--text-secondary)" }}>
+              Logout
             </button>
           )}
           {onUploadClick && (
