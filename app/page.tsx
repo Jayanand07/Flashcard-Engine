@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dailySummary, setDailySummary] = useState<{ cardsReviewed: number, decksCount: number } | null>(null);
 
   const fetchDecks = async () => {
     setLoading(true);
@@ -40,6 +41,26 @@ export default function Dashboard() {
       stats: sm[d.id] ? { mastered: sm[d.id].mastered, learning: sm[d.id].learning, newCards: sm[d.id].newCards } : undefined,
       dueToday: sm[d.id]?.due ?? 0,
     })));
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const { data: sessionData } = await supabase
+      .from("sessions")
+      .select("deck_id, cards_reviewed")
+      .gte("completed_at", startOfToday.toISOString());
+
+    if (sessionData && sessionData.length > 0) {
+      let reviewed = 0;
+      const uniqueDecks = new Set();
+      sessionData.forEach(s => {
+        reviewed += s.cards_reviewed;
+        uniqueDecks.add(s.deck_id);
+      });
+      if (reviewed > 0) {
+        setDailySummary({ cardsReviewed: reviewed, decksCount: uniqueDecks.size });
+      } else setDailySummary(null);
+    } else setDailySummary(null);
+
     setLoading(false);
   };
 
@@ -114,6 +135,15 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Daily Summary Banner */}
+        {!loading && dailySummary && (
+          <div className="animate-fade-up mt-4 rounded-xl py-3 px-5 text-center" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)" }}>
+            <p className="text-sm font-bold" style={{ color: "var(--success)" }}>
+              Today: {dailySummary.cardsReviewed} cards reviewed across {dailySummary.decksCount} deck{dailySummary.decksCount > 1 ? "s" : ""} 💪
+            </p>
           </div>
         )}
 

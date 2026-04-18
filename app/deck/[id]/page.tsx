@@ -124,6 +124,12 @@ export default function DeckPage({ params }: { params: { id: string } }) {
   const retentionColor = retention > 70 ? "var(--success)" : retention >= 30 ? "var(--warning)" : "var(--danger)";
   const retentionMsg = retention === 0 ? "Keep practicing!" : retention < 50 ? "Getting there! 💪" : retention < 80 ? "Great progress! 🔥" : "Almost mastered! ⭐";
 
+  let motivationalMsg = "🌱 Just getting started — every card counts!";
+  if (retention >= 90) motivationalMsg = "🏆 Deck mastered! You've conquered this topic!";
+  else if (retention >= 60) motivationalMsg = "⭐ Almost mastered — you're so close!";
+  else if (retention >= 30) motivationalMsg = "🔥 Great progress — you're really learning this!";
+  else if (retention >= 1) motivationalMsg = "📈 Building momentum — keep practicing daily!";
+
   const mp = (masteredCount / total) * 100;
   const lp = (learningCount / total) * 100;
   const np = (newCount / total) * 100;
@@ -207,10 +213,16 @@ export default function DeckPage({ params }: { params: { id: string } }) {
                 <div style={{ width: `${np}%`, background: "#6b7280", transition: "width 0.6s" }} />
               </div>
 
-              <div className="mt-3 flex items-center gap-5 text-xs" style={{ color: "var(--text-secondary)" }}>
-                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#22c55e" }} />{masteredCount} Mastered</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />{learningCount} Learning</span>
-                <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#6b7280" }} />{newCount} New</span>
+              <div className="mt-3 flex items-center justify-between text-xs" style={{ color: "var(--text-secondary)" }}>
+                <div className="flex items-center gap-5">
+                  <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#22c55e" }} />{masteredCount} Mastered</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#f59e0b" }} />{learningCount} Learning</span>
+                  <span className="flex items-center gap-1.5"><span className="inline-block h-2 w-2 rounded-full" style={{ background: "#6b7280" }} />{newCount} New</span>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-3 border-t text-center text-xs italic font-medium" style={{ borderColor: 'var(--border)', color: retentionColor }}>
+                {motivationalMsg}
               </div>
             </div>
           )}

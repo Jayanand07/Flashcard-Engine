@@ -28,6 +28,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
   const [easyCount, setEasyCount] = useState(0);
   const [currentStreak, setCurrentStreak] = useState(0);
   const [bestStreak, setBestStreak] = useState(0);
+  const [newMasteredCount, setNewMasteredCount] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
   const [showMilestone, setShowMilestone] = useState<string | null>(null);
   const [deckName, setDeckName] = useState("");
@@ -122,6 +123,11 @@ export default function PracticePage({ params }: { params: { id: string } }) {
         body: JSON.stringify({ card_id: card.id, rating, current_interval: card.interval, current_ease_factor: card.ease_factor, current_difficulty: card.difficulty }),
       });
       if (!res.ok) throw new Error("Failed");
+      
+      const updatedCard = await res.json();
+      if ((card.difficulty === "new" || card.difficulty === "learning") && updatedCard.difficulty === "mastered") {
+        setNewMasteredCount(prev => prev + 1);
+      }
 
       if (rating === "hard") { setCardAnim("animate-shake"); await new Promise(r => setTimeout(r, 400)); }
       setCardAnim(rating === "easy" ? "animate-card-exit-left" : "animate-card-exit-fade");
@@ -133,9 +139,14 @@ export default function PracticePage({ params }: { params: { id: string } }) {
       setIsSubmitting(false);
       setCardAnim("animate-card-enter-right");
 
-      if (next === Math.floor(cards.length / 2) && cards.length > 4) {
-        setShowMilestone("🔥 Halfway there!"); setTimeout(() => setShowMilestone(null), 2000);
+      if (next === 10) {
+        setShowMilestone("🔥 10 cards done! Keep going!"); setTimeout(() => setShowMilestone(null), 2000);
+      } else if (next === 25) {
+        setShowMilestone("⚡ Halfway there! You're crushing it!"); setTimeout(() => setShowMilestone(null), 2000);
+      } else if (next === 40) {
+        setShowMilestone("🎯 Almost done! 10 cards left!"); setTimeout(() => setShowMilestone(null), 2000);
       }
+
       if (next >= cards.length) {
         setShowCompletion(true);
         await saveSession({ hard: newHard, okay: newOkay, easy: newEasy });
@@ -158,6 +169,7 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     setEasyCount(0);
     setBestStreak(0);
     setCurrentStreak(0);
+    setNewMasteredCount(0);
     setShowCompletion(false);
     setCardAnim("");
     setExplanationMap({});
@@ -207,6 +219,10 @@ export default function PracticePage({ params }: { params: { id: string } }) {
           <div className="animate-bounce-in mb-4 text-6xl">🎉</div>
           <h2 className="animate-fade-up animate-delay-100 text-3xl font-bold tracking-tight text-white">Session Complete!</h2>
           <p className="animate-fade-up animate-delay-200 mt-2 text-sm text-white/60">Your brain just got stronger</p>
+          
+          <div className="animate-fade-up animate-delay-200 mt-4 rounded-xl py-3 px-4 shadow-sm" style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)" }}>
+            <p className="text-sm font-bold text-white">📊 This session: <span className="text-green-300">{newMasteredCount}</span> new cards mastered</p>
+          </div>
 
           {total > 0 && (
             <div className="animate-fade-up animate-delay-300 mt-6 space-y-4">
@@ -289,8 +305,8 @@ export default function PracticePage({ params }: { params: { id: string } }) {
 
       {/* Milestone */}
       {showMilestone && (
-        <div className="fixed inset-x-0 top-24 flex justify-center animate-fade-up" style={{ zIndex: 50 }}>
-          <span className="rounded-full px-5 py-2 text-sm font-bold text-white shadow-lg" style={{ background: "var(--accent)" }}>{showMilestone}</span>
+        <div className="fixed inset-x-0 top-24 flex justify-center animate-slide-down" style={{ zIndex: 50 }}>
+          <span className="rounded-full px-6 py-3 text-sm font-bold text-white shadow-lg" style={{ background: "var(--accent)" }}>{showMilestone}</span>
         </div>
       )}
 
