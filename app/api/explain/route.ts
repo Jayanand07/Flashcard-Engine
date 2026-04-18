@@ -1,34 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-const apiKey = process.env.GEMINI_API_KEY!;
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 export async function POST(req: NextRequest) {
   try {
-    const { question, answer } = await req.json();
+    const body = await req.json();
+    const { question, answer } = body;
 
     if (!question || !answer) {
-      return NextResponse.json(
-        { error: "Question and answer are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Question and answer are required" }, { status: 400 });
     }
 
-    const prompt = `Explain this concept in simple terms: 
-Question: ${question}
-Answer: ${answer}`;
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `
+      Context: A flashcard with 
+      Question: "${question}"
+      Answer: "${answer}"
+
+      Task: Provide a concise (max 100 words), helpful, and plain-English explanation of this concept. 
+      Why is this the answer? If it's a fact, give a bit of background. If it's a process, explain it briefly.
+      Keep it encouraging and educational.
+    `;
 
     const result = await model.generateContent(prompt);
-    const text = result.response.text();
+    const response = await result.response;
+    const text = response.text();
 
-    return NextResponse.json({ explanation: text }, { status: 200 });
+    return NextResponse.json({ explanation: text });
   } catch (error) {
-    console.error("Explain API Error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate explanation. Please try again." },
-      { status: 500 }
-    );
+    console.error("[api/explain/POST]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

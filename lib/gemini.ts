@@ -45,7 +45,7 @@ ${trimmedText}`;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    let text = response.text();
+    const text = response.text();
 
     // Strictly isolate the JSON Array from the response
     const match = text.match(/\[[\s\S]*\]/);
@@ -95,7 +95,7 @@ ${trimmedText}`;
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    let text = response.text();
+    const text = response.text();
 
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) throw new Error("No JSON array found in the AI response");

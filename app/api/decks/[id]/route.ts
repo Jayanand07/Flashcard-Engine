@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { SUPABASE_TABLES } from "@/lib/constants";
+import { isValidUUID } from "@/lib/utils";
 
 export async function GET(
   req: NextRequest,
@@ -7,10 +9,14 @@ export async function GET(
 ) {
   try {
     const { id } = params;
-    const supabase = createClient();
 
+    if (!id || !isValidUUID(id)) {
+      return NextResponse.json({ error: "Invalid deck ID" }, { status: 400 });
+    }
+
+    const supabase = createClient();
     const { data: deck, error } = await supabase
-      .from("decks")
+      .from(SUPABASE_TABLES.DECKS)
       .select("*")
       .eq("id", id)
       .single();
@@ -19,11 +25,12 @@ export async function GET(
       if (error.code === 'PGRST116') {
         return NextResponse.json({ error: "Deck not found" }, { status: 404 });
       }
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      throw error;
     }
 
     return NextResponse.json({ deck });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error: unknown) {
+    console.error("[api/decks/[id]/GET]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

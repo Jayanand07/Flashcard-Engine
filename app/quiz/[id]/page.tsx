@@ -1,19 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import Skeleton from "@/components/ui/Skeleton";
 import { createClient } from "@/lib/supabase/client";
 import confetti from "canvas-confetti";
-
-interface MCQ {
-  id: string;
-  question: string;
-  options: string[];
-  correct_index: number;
-  explanation: string;
-}
+import { useMCQs } from "@/hooks/useMCQs";
+import { useDecks } from "@/hooks/useDecks";
 
 interface QuizResult {
   question: string;
@@ -23,74 +17,102 @@ interface QuizResult {
   is_correct: boolean;
 }
 
+const ScoreRing = ({ accuracy }: { accuracy: number }) => {
+  const size = 160;
+  const stroke = 12;
+  const r = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - accuracy/100);
+  const color = accuracy >= 80 ? "#22c55e" : accuracy >= 50 ? "#f59e0b" : "#ef4444";
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
+          strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000" />
+      </svg>
+      <div className="absolute flex flex-col items-center">
+        <span className="text-4xl font-black">{accuracy}%</span>
+        <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Accuracy</span>
+      </div>
+    </div>
+  );
+};
+
 export default function QuizPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const deckId = params.id;
-  const [mcqs, setMcqs] = useState<MCQ[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { mcqs, loading: mcqsLoading, error: mcqsError, refetch: fetchMCQs } = useMCQs(deckId);
+  const { decks } = useDecks();
+  const deck = useMemo(() => decks.find(d => d.id === deckId), [decks, deckId]);
+  const deckName = deck?.name || "Quiz";
+
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [score, setScore] = useState(0);
   const [results, setResults] = useState<QuizResult[]>([]);
   const [showCompletion, setShowCompletion] = useState(false);
-  const [deckName, setDeckName] = useState("");
   const [expandedResult, setExpandedResult] = useState<number | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [showMigrateBanner, setShowMigrateBanner] = useState(true);
   const supabase = createClient();
 
   useEffect(() => {
-    (async () => {
-      try {
-        const [mcqRes, deckRes] = await Promise.all([
-          fetch(`/api/mcq?deck_id=${deckId}`),
-          fetch(`/api/decks/${deckId}`)
-        ]);
-        
-        if (mcqRes.ok) {
-          const data = await mcqRes.json();
-          setMcqs(data);
-        }
-        if (deckRes.ok) {
-          const data = await deckRes.json();
-          setDeckName(data.deck?.name || "Unknown Deck");
-        }
-      } catch (err) {
-        console.error("Failed to fetch quiz data:", err);
-      } finally {
-        setLoading(false);
-      }
-    })();
-
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
+    supabase.auth.getUser().then(() => {
+        // Just checking session
     });
-  }, [deckId, supabase]);
+  }, [supabase]);
 
-  const generateMissingQuiz = async () => {
-    setIsGenerating(true);
-    try {
-      const res = await fetch("/api/mcq/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deck_id: deckId }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setMcqs(data.mcqs);
-      } else {
-        const err = await res.json();
-        alert(err.error || "Failed to generate quiz.");
-      }
-    } catch (error) {
-      alert("Failed to generate quiz.");
-    } finally {
-      setIsGenerating(false);
+  const handleOptionSelect = useCallback((index: number) => {
+    if (showFeedback || !mcqs[currentIndex]) return;
+    setSelectedOption(index);
+    setShowFeedback(true);
+    
+    const isCorrect = index === mcqs[currentIndex].correct_index;
+    if (isCorrect) {
+      confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
     }
-  };
+    
+    setResults(prev => [...prev, {
+      question: mcqs[currentIndex].question,
+      user_answer: index,
+      correct_answer: mcqs[currentIndex].correct_index,
+      explanation: mcqs[currentIndex].explanation,
+      is_correct: isCorrect
+    }]);
+  }, [mcqs, currentIndex, showFeedback]);
 
+  const nextQuestion = useCallback(async () => {
+    if (currentIndex + 1 < mcqs.length) {
+      setCurrentIndex(currentIndex + 1);
+      setSelectedOption(null);
+      setShowFeedback(false);
+    } else {
+      setShowCompletion(true);
+      const finalScore = results.filter(r => r.is_correct).length;
+      const total = mcqs.length;
+      const accuracyValue = total > 0 ? Math.round((finalScore / total) * 100) : 0;
+      
+      try {
+        await fetch("/api/quiz-sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deck_id: deckId,
+            deck_name: deckName,
+            score: finalScore,
+            total_questions: total,
+            accuracy: accuracyValue
+          })
+        });
+        router.refresh();
+      } catch {
+        // Silently fail or handle error if needed
+      }
+      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+    }
+  }, [currentIndex, mcqs, results, deckId, deckName, router]);
+
+  // Keyboard shortcuts
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (!showFeedback && !showCompletion) {
@@ -107,187 +129,76 @@ export default function QuizPage({ params }: { params: { id: string } }) {
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [showFeedback, showCompletion, currentIndex, mcqs]);
+  }, [showFeedback, showCompletion, currentIndex, mcqs, handleOptionSelect, nextQuestion]);
 
-  const handleOptionSelect = (index: number, e?: React.MouseEvent) => {
-    if (showFeedback) return;
-    setSelectedOption(index);
-    setShowFeedback(true);
-    
-    const isCorrect = index === mcqs[currentIndex].correct_index;
-    if (isCorrect) {
-      setScore(s => s + 1);
-      if (e) {
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const x = (rect.left + rect.width / 2) / window.innerWidth;
-        const y = (rect.top + rect.height / 2) / window.innerHeight;
-        confetti({ particleCount: 60, spread: 50, origin: { x, y } });
-      } else {
-        confetti({ particleCount: 60, spread: 50, origin: { y: 0.6 } });
-      }
-    }
-    
-    setResults(prev => [...prev, {
-      question: mcqs[currentIndex].question,
-      user_answer: index,
-      correct_answer: mcqs[currentIndex].correct_index,
-      explanation: mcqs[currentIndex].explanation,
-      is_correct: isCorrect
-    }]);
-  };
-
-  const nextQuestion = async () => {
-    if (currentIndex + 1 < mcqs.length) {
-      setCurrentIndex(currentIndex + 1);
-      setSelectedOption(null);
-      setShowFeedback(false);
-    } else {
-      setShowCompletion(true);
-      // Save stats to DB
-      const accuracy = Math.round(((score + (selectedOption === mcqs[currentIndex].correct_index ? 1 : 0)) / mcqs.length) * 100);
-      try {
-        await fetch("/api/quiz-sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deck_id: deckId,
-            deck_name: deckName,
-            score: score + (selectedOption === mcqs[currentIndex].correct_index ? 1 : 0),
-            total_questions: mcqs.length,
-            accuracy: accuracy
-          })
-        });
-        router.refresh();
-      } catch (err) {
-        console.error("Failed to save quiz session:", err);
-      }
-      confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-    }
-  };
-
-  if (loading) return (
+  if (mcqsLoading) return (
     <div className="flex min-h-screen flex-col" style={{ backgroundColor: "var(--bg)" }}>
-      <div className="mx-auto mt-20 w-full max-w-2xl px-6">
-        <div className="skeleton-shimmer h-4 w-24 rounded mb-6" />
-        <div className="skeleton-shimmer h-12 w-full rounded-xl mb-10" />
-        <div className="space-y-3">
-          {[1,2,3,4].map(i => <div key={i} className="skeleton-shimmer h-16 w-full rounded-xl" />)}
+      <Navbar />
+      <div className="mx-auto mt-12 w-full max-w-3xl px-6">
+        <Skeleton h="8px" r="999px" className="mb-12" />
+        <Skeleton h="280px" r="32px" className="mb-8" />
+        <div className="grid gap-4">
+           {[1,2,3,4].map(i => <Skeleton key={i} h="64px" r="20px" />)}
         </div>
       </div>
     </div>
   );
 
+  if (mcqsError) return (
+    <div className="flex min-h-screen flex-col" style={{ backgroundColor: "var(--bg)" }}>
+       <Navbar />
+       <div className="mx-auto mt-20 text-center">
+          <p className="font-bold text-danger">Failed to load quiz.</p>
+          <button onClick={() => fetchMCQs()} className="mt-4 rounded-xl bg-accent px-6 py-2 text-sm font-bold text-white">Retry</button>
+       </div>
+    </div>
+  );
+
   if (showCompletion) {
-    const accuracy = Math.round((score / mcqs.length) * 100);
-    const feedback = accuracy >= 80 ? { text: "Excellent! 🏆", color: "var(--success)" } : 
-                     accuracy >= 50 ? { text: "Good job! 👍", color: "var(--warning)" } : 
-                     { text: "Keep practicing! 💪", color: "var(--danger)" };
+    const total = mcqs.length;
+    const finalScore = results.filter(r => r.is_correct).length;
+    const accuracy = total > 0 ? Math.round((finalScore / total) * 100) : 0;
+    const feedbackText = accuracy >= 80 ? { text: "Excellent! 🏆", color: "#22c55e" } : 
+                         accuracy >= 50 ? { text: "Good job! 👍", color: "#f59e0b" } : 
+                         { text: "Keep at it! 💪", color: "#ef4444" };
 
     return (
-      <div className="min-h-screen pb-20" style={{ backgroundColor: "var(--bg)" }}>
+      <div className="min-h-screen bg-gradient-to-br from-[#7c6af7] to-[#a855f7] text-white">
         <Navbar />
-        <main className="mx-auto max-w-2xl px-6 pt-12 animate-fade-up">
-          <div className="rounded-[32px] p-10 text-center relative overflow-hidden" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-            <div className="absolute top-0 left-0 right-0 h-1.5" style={{ background: feedback.color }} />
-            <h2 className="text-4xl font-black mb-2" style={{ color: "var(--text-primary)" }}>{score} / {mcqs.length}</h2>
-            <p className="text-xl font-bold mb-6" style={{ color: feedback.color }}>{feedback.text}</p>
-            <div className="flex justify-center gap-8 text-sm mb-8">
-              <div>
-                <p style={{ color: "var(--text-secondary)" }}>Accuracy</p>
-                <p className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{accuracy}%</p>
-              </div>
-              <div>
-                <p style={{ color: "var(--text-secondary)" }}>Questions</p>
-                <p className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>{mcqs.length}</p>
-              </div>
+        <main className="mx-auto max-w-3xl px-6 py-12">
+          <div className="flex flex-col items-center text-center">
+            <ScoreRing accuracy={accuracy} />
+            <h2 className="mt-8 text-4xl font-black">{finalScore} / {total}</h2>
+            <p className="mt-2 text-xl font-bold" style={{ color: feedbackText.color }}>{feedbackText.text}</p>
+            
+            <div className="mt-12 flex w-full max-w-md gap-4">
+              <button onClick={() => window.location.reload()} className="flex-1 rounded-2xl bg-white py-4 text-sm font-black text-accent transition-all hover:scale-[1.02] active:scale-[0.98]">
+                Try Again
+              </button>
+              <button onClick={() => router.push("/")} className="flex-1 rounded-2xl bg-white/10 py-4 text-sm font-bold backdrop-blur-md transition-all hover:bg-white/20">
+                Dashboard
+              </button>
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => window.location.reload()} className="flex-1 rounded-xl py-3.5 text-sm font-bold text-white" style={{ backgroundColor: "var(--accent)" }}>Try Again</button>
-              <button onClick={() => router.push(`/deck/${deckId}`)} className="flex-1 rounded-xl py-3.5 text-sm font-bold" style={{ background: "var(--surface-2)", color: "var(--text-primary)" }}>Back to Deck</button>
-            </div>
-
-            {user?.is_anonymous && showMigrateBanner && (
-              <div style={{
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border)',
-                borderRadius: '12px',
-                padding: '12px 20px',
-                marginTop: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '12px',
-                position: 'relative'
-              }}>
-                <span style={{fontSize:'13px', color:'var(--text-secondary)', textAlign: 'left'}}>
-                  💾 Sign in with Google to save your progress permanently
-                </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button onClick={() => router.push('/login')} style={{
-                    background: '#7c6af7',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '6px 14px',
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap'
-                  }}>
-                    Sign in →
-                  </button>
-                  <button 
-                    onClick={() => setShowMigrateBanner(false)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      fontSize: '18px',
-                      padding: '4px'
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
-          <div className="mt-12">
-            <h3 className="text-sm font-bold uppercase tracking-widest mb-6" style={{ color: "var(--text-secondary)" }}>Review Your Answers</h3>
-            <div className="space-y-4">
+          <div className="mt-20">
+            <h3 className="mb-6 text-sm font-black uppercase tracking-[0.2em] opacity-60">Review Your Answers</h3>
+            <div className="grid gap-3">
               {results.map((res, i) => (
-                <div key={i} className="rounded-2xl border" style={{ borderColor: "var(--border)", background: "var(--surface)" }}>
-                  <button 
-                    onClick={() => setExpandedResult(expandedResult === i ? null : i)}
-                    className="w-full flex items-center justify-between p-5 text-left"
-                  >
+                <div key={i} className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
+                  <button onClick={() => setExpandedResult(expandedResult === i ? null : i)} className="flex w-full items-center justify-between p-5 text-left">
                     <div className="flex items-center gap-4">
-                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${res.is_correct ? "bg-green-500" : "bg-red-500"}`}>
+                      <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white ${res.is_correct ? "bg-green-500" : "bg-red-500"}`}>
                         {res.is_correct ? "✓" : "✕"}
                       </span>
-                      <span className="text-sm font-semibold line-clamp-1" style={{ color: "var(--text-primary)" }}>{res.question}</span>
+                      <span className="text-sm font-bold line-clamp-1">{res.question}</span>
                     </div>
-                    <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{expandedResult === i ? "↑" : "↓"}</span>
+                    <span className="text-xs opacity-40">{expandedResult === i ? "↑" : "↓"}</span>
                   </button>
                   {expandedResult === i && (
-                    <div className="px-5 pb-6 animate-fade-in border-t pt-4" style={{ borderColor: "var(--border)" }}>
-                      <p className="text-sm font-bold mb-3" style={{ color: "var(--text-primary)" }}>{res.question}</p>
-                      <div className="space-y-3 mb-4">
-                        <div className={`rounded-xl p-3 text-sm border ${res.user_answer === res.correct_answer ? "bg-green-50 dark:bg-green-900/10 border-green-200" : "bg-red-50 dark:bg-red-900/10 border-red-200"}`}>
-                          <span className="font-bold mr-2">Your answer:</span> {mcqs[i].options[res.user_answer]}
-                        </div>
-                        {!res.is_correct && (
-                          <div className="rounded-xl p-3 text-sm bg-green-50 dark:bg-green-900/10 border border-green-200">
-                             <span className="font-bold mr-2">Correct answer:</span> {mcqs[i].options[res.correct_answer]}
-                          </div>
-                        )}
-                      </div>
-                      <div className="rounded-xl p-4 text-xs leading-relaxed" style={{ background: "var(--surface-2)", color: "var(--text-secondary)" }}>
-                        <strong className="block mb-1 text-primary" style={{ color: "var(--text-primary)" }}>💡 Explanation:</strong>
-                        {res.explanation}
-                      </div>
+                    <div className="border-t border-white/10 px-5 pb-6 pt-4 animate-fade-in">
+                      <p className="text-xs font-black uppercase tracking-widest opacity-40 mb-3">Explanation</p>
+                      <p className="text-sm leading-relaxed opacity-80">{res.explanation}</p>
                     </div>
                   )}
                 </div>
@@ -299,94 +210,80 @@ export default function QuizPage({ params }: { params: { id: string } }) {
     );
   }
 
-  const currentMCQ = mcqs[currentIndex];
-  const progress = ((currentIndex + 1) / mcqs.length) * 100;
+  const progressValue = mcqs.length > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / mcqs.length) * 100 : 0;
 
   return (
-    <div className="flex min-h-screen flex-col" style={{ backgroundColor: "var(--bg)" }}>
-      {/* Top bar */}
-      <div className="border-b" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-4">
-          <button onClick={() => router.push(`/deck/${deckId}`)} className="flex items-center gap-2 text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Exit
-          </button>
-          <div className="flex-1 px-8">
-            <div className="h-1.5 w-full rounded-full" style={{ background: "var(--surface-2)" }}>
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: "var(--accent)" }} />
-            </div>
-          </div>
-          <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>Q {currentIndex + 1} / {mcqs.length}</span>
+    <div className="flex min-h-screen flex-col bg-grid-pattern" style={{ backgroundColor: "var(--bg)" }}>
+      {/* Progress Bar Top */}
+      <div className="border-b bg-surface/50 backdrop-blur-md sticky top-0 z-40" style={{ borderColor: 'var(--border)' }}>
+        <div className="mx-auto flex max-w-4xl items-center gap-8 px-6 py-4">
+           <button onClick={() => router.push("/")} className="shrink-0 text-[11px] font-black uppercase tracking-widest text-secondary hover:text-primary">Exit</button>
+           <div className="relative flex-1">
+              <div className="h-2 w-full rounded-full bg-surface-2">
+                 <div className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
+                   style={{ width: `${progressValue}%`, background: "linear-gradient(90deg, #7c6af7, #a855f7)" }} />
+              </div>
+              <span className="absolute -top-6 right-0 text-[10px] font-black text-accent">{Math.round(progressValue)}% Complete</span>
+           </div>
+           <span className="shrink-0 text-[11px] font-black tabular-nums text-primary">{currentIndex + 1} / {mcqs.length}</span>
         </div>
       </div>
 
-      <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-12 flex flex-col items-center justify-center">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-6 py-12">
         {mcqs.length > 0 ? (
           <div className="w-full animate-fade-up" key={currentIndex}>
-            <div className="text-center mb-10">
-              <span className="inline-block rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest mb-4" style={{ background: "var(--surface-2)", color: "var(--accent)" }}>Question {currentIndex + 1}</span>
-              <h2 className="text-2xl sm:text-3xl font-bold leading-tight" style={{ color: "var(--text-primary)" }}>{currentMCQ.question}</h2>
+            {/* Question Card */}
+            <div className="mb-12 text-center">
+              <span className="inline-flex rounded-full bg-accent/10 px-4 py-1.5 text-[10px] font-black uppercase tracking-widest text-accent mb-6">Question {currentIndex + 1}</span>
+              <h2 className="text-3xl font-black leading-tight tracking-tight sm:text-4xl" style={{ color: "var(--text-primary)" }}>{mcqs[currentIndex].question}</h2>
             </div>
 
+            {/* Options */}
             <div className="grid gap-3 w-full">
-              {currentMCQ.options.map((option, i) => {
-                const isSelected = selectedOption === i;
-                const isCorrect = i === currentMCQ.correct_index;
-                const showFeedback = selectedOption !== null;
-                const showCorrect = showFeedback && isCorrect;
-                const showWrong = showFeedback && isSelected && !isCorrect;
-
-                return (
-                  <button
-                    key={i}
-                    disabled={showFeedback}
-                    onClick={(e) => handleOptionSelect(i, e)}
-                    className={`w-full flex items-center gap-4 rounded-2xl p-5 text-left text-sm font-medium border transition-all ${!showFeedback ? "hover:scale-[1.01] hover:border-violet-400" : ""} ${showCorrect ? "scale-[1.02]" : ""} ${showWrong ? "animate-shake" : ""}`}
-                    style={{
-                      background: showCorrect ? "#dcfce7" : showWrong ? "#fee2e2" : "var(--surface)",
-                      borderColor: showCorrect ? "#22c55e" : showWrong ? "#ef4444" : "var(--border)",
-                      color: (showCorrect || showWrong) ? "#0a0a0f" : "var(--text-primary)"
-                    }}
-                  >
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold border transition-colors ${isSelected ? "bg-violet-600 text-white border-violet-600" : "border-gray-200"}`}>
-                      {String.fromCharCode(65 + i)}
-                    </span>
-                    <span className="flex-1">{option}</span>
-                    {showCorrect && <span className="text-green-600 font-bold">✓ Correct!</span>}
-                    {showWrong && <span className="text-red-600 font-bold">✕ Wrong</span>}
-                  </button>
-                );
+              {mcqs[currentIndex].options.map((opt, i) => {
+                 const isSelected = selectedOption === i;
+                 const isCorrectFlag = i === mcqs[currentIndex].correct_index;
+                 const statusValue = showFeedback 
+                    ? (isCorrectFlag ? "correct" : (isSelected ? "wrong" : "idle"))
+                    : "idle";
+                 
+                 return (
+                   <button key={i} disabled={showFeedback} onClick={() => handleOptionSelect(i)}
+                     className={`group relative flex h-[64px] w-full items-center gap-4 rounded-2xl border-2 px-6 text-left transition-all ${statusValue === 'idle' ? 'hover:translate-x-1 hover:border-accent active:scale-[0.99]' : ''}`}
+                     style={{
+                        backgroundColor: statusValue === 'correct' ? '#dcfce7' : statusValue === 'wrong' ? '#fee2e2' : 'var(--surface)',
+                        borderColor: statusValue === 'correct' ? '#22c55e' : statusValue === 'wrong' ? '#ef4444' : 'var(--border)',
+                        color: statusValue === 'idle' ? 'var(--text-primary)' : '#0a0a0f'
+                     }}>
+                     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-black transition-colors ${isSelected ? 'bg-accent border-accent text-white' : 'border-gray-200 group-hover:border-accent group-hover:text-accent'}`}>
+                        {String.fromCharCode(65 + i)}
+                     </span>
+                     <span className="flex-1 text-sm font-bold">{opt}</span>
+                     {statusValue === 'correct' && <span className="text-green-600 font-bold">Correct!</span>}
+                     {statusValue === 'wrong' && <span className="text-red-600 font-bold">Wrong</span>}
+                   </button>
+                 );
               })}
             </div>
 
+            {/* Feedback & Next */}
             {showFeedback && (
-              <div className="mt-8 animate-fade-up">
-                <div className={`rounded-2xl p-6 border ${selectedOption === currentMCQ.correct_index ? "border-green-200 bg-green-50 dark:bg-green-900/10" : "border-red-200 bg-red-50 dark:bg-red-900/10"}`}>
-                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: selectedOption === currentMCQ.correct_index ? "#166534" : "#991b1b" }}>💡 Explanation</p>
-                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>{currentMCQ.explanation}</p>
+              <div className="mt-10 animate-fade-up">
+                <div className="rounded-3xl border-2 bg-surface p-6 shadow-xl" 
+                  style={{ borderColor: selectedOption === mcqs[currentIndex].correct_index ? '#22c55e33' : '#ef444433' }}>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2">Analysis</p>
+                  <p className="text-sm font-medium leading-relaxed text-secondary">{mcqs[currentIndex].explanation}</p>
                 </div>
-                <button onClick={nextQuestion} className="mt-6 w-full rounded-2xl py-4 text-sm font-bold text-white shadow-lg transition-transform active:scale-[0.98]" style={{ backgroundColor: "var(--accent)" }}>
-                  {currentIndex + 1 === mcqs.length ? "Finish Quiz" : "Next Question →"}
+                <button onClick={nextQuestion} className="mt-8 h-16 w-full rounded-2xl bg-accent text-sm font-black text-white shadow-xl shadow-accent/20 transition-all hover:scale-[1.01] active:scale-[0.98]">
+                   {currentIndex + 1 === mcqs.length ? "Finish Quiz" : "Next Question →"}
                 </button>
-              </div>
-            )}
-            
-            {!showCompletion && (
-              <div className="mt-8 text-center text-[11px] font-medium tracking-wide" style={{ color: "var(--text-secondary)" }}>
-                {showFeedback ? "SPACE / ENTER for next" : "1-4 to answer"}
               </div>
             )}
           </div>
         ) : (
           <div className="text-center">
-            <p className="mb-6 font-bold" style={{ color: "var(--text-primary)" }}>No quiz available for this deck yet.</p>
-            <button 
-              onClick={generateMissingQuiz} 
-              disabled={isGenerating}
-              className="w-full rounded-xl py-3 text-sm font-bold text-white transition-all disabled:opacity-50"
-              style={{ backgroundColor: "var(--accent)" }}
-            >
-              {isGenerating ? "Generating Quiz..." : "✨ Generate Quiz Now"}
-            </button>
+            <p className="mb-6 font-bold text-secondary">No quiz data found.</p>
+            <button onClick={() => router.push("/")} className="rounded-xl bg-accent px-8 py-3 text-sm font-black text-white">Go Home</button>
           </div>
         )}
       </main>

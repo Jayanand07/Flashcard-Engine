@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateMCQs } from "@/lib/gemini";
+import { SUPABASE_TABLES } from "@/lib/constants";
+import { isValidUUID } from "@/lib/utils";
 
 export async function POST(req: NextRequest) {
   try {
     const { deck_id } = await req.json();
-    if (!deck_id) {
-      return NextResponse.json({ error: "deck_id is required" }, { status: 400 });
+    if (!deck_id || !isValidUUID(deck_id)) {
+      return NextResponse.json({ error: "Invalid deck ID" }, { status: 400 });
     }
 
     const supabase = createClient();
@@ -17,7 +19,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Fetch deck info
     const { data: deck, error: deckError } = await supabase
-      .from("decks")
+      .from(SUPABASE_TABLES.DECKS)
       .select("name")
       .eq("id", deck_id)
       .single();
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Fetch existing flashcards
     const { data: cards, error: cardsError } = await supabase
-      .from("cards")
+      .from(SUPABASE_TABLES.CARDS)
       .select("question, answer")
       .eq("deck_id", deck_id);
 
@@ -41,18 +43,18 @@ export async function POST(req: NextRequest) {
 
     // 3. Prepare context for MCQ generation
     const contentContext = `Topic: ${deck.name}\n\nContent:\n` + 
-      cards.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n");
+      cards.map((c: { question: string; answer: string }) => `Q: ${c.question}\nA: ${c.answer}`).join("\n");
 
     // 4. Generate MCQs using Gemini
     const mcqs = await generateMCQs(contentContext);
 
     if (!mcqs || mcqs.length === 0) {
-      throw new Error("AI returned empty MCQs array");
+      throw new Error("AI returned no results");
     }
 
     // 5. Insert MCQs into the database
-    const mcqsArray = mcqs.map((m) => ({
-      deck_id,
+    const mcqsArray = mcqs.map((m: { question: string; options: string[]; correct_index: number; explanation: string }) => ({
+      deck_id: deck_id,
       question: m.question,
       options: m.options,
       correct_index: m.correct_index,
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
       user_id: user.id,
     }));
 
-    const { error: insertError } = await supabase.from("mcqs").insert(mcqsArray);
+    const { error: insertError } = await supabase.from(SUPABASE_TABLES.MCQS).insert(mcqsArray);
 
     if (insertError) {
       throw new Error(`Failed to save generated MCQs: ${insertError.message}`);
@@ -68,9 +70,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, mcqs: mcqsArray }, { status: 201 });
   } catch (error) {
-    console.error("MCQ Generate Error:", error);
+    console.error("[api/mcq/generate/POST]", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to generate MCQs" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

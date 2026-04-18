@@ -1,25 +1,27 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
+import { APP_NAME } from "@/lib/constants";
+import { truncateEmail } from "@/lib/utils";
+import { User } from "@supabase/supabase-js";
 
 interface NavbarProps { onUploadClick?: () => void; }
 
-export default function Navbar({ onUploadClick }: NavbarProps) {
+const Navbar = ({ onUploadClick }: NavbarProps) => {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
     setMounted(true);
-    // Listen for auth changes to keep navbar in sync
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
@@ -30,19 +32,18 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
     return () => subscription.unsubscribe();
   }, [supabase]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
     router.refresh();
-  };
+  }, [supabase.auth, router]);
 
-  const handleSignIn = () => {
+  const handleSignIn = useCallback(() => {
     router.push('/login');
-  };
+  }, [router]);
 
-  const truncateEmail = (email: string) => {
-    if (!email) return "";
-    return email.length > 20 ? email.substring(0, 17) + "..." : email;
-  };
+  const handleThemeToggle = useCallback(() => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  }, [theme, setTheme]);
 
   const isAnonymous = user?.is_anonymous || false;
   const userIdentifier = user?.email || "Guest";
@@ -50,24 +51,26 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
   return (
     <nav className="navbar-gradient-border sticky top-0 z-50 backdrop-blur-xl"
       style={{ backgroundColor: "color-mix(in srgb, var(--bg) 85%, transparent)" }}>
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
         {/* Left: logo + nav */}
-        <div className="flex items-center gap-5">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl">⚡</span>
-            <span className="text-sm font-bold tracking-tight" style={{ color: "var(--text-primary)" }}>FlashCard Engine</span>
+        <div className="flex items-center gap-4 sm:gap-6">
+          <Link href="/" className="flex items-center gap-2 transition-transform active:scale-95">
+            <span className="text-xl sm:text-2xl">⚡</span>
+            <span className="hidden text-sm font-bold tracking-tight sm:block" style={{ color: "var(--text-primary)" }}>{APP_NAME}</span>
+            <span className="text-sm font-bold sm:hidden" style={{ color: "var(--text-primary)" }}>FE</span>
           </Link>
           <Link href="/history"
-            className="text-sm font-medium transition-colors"
+            className="flex items-center gap-1.5 text-sm font-semibold transition-colors"
             style={{ color: pathname === "/history" ? "var(--accent)" : "var(--text-secondary)" }}>
-            History
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+            <span className="hidden sm:inline">History</span>
           </Link>
         </div>
 
         {/* Right: toggle + user + upload */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {mounted && (
-            <button onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            <button onClick={handleThemeToggle}
               className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
               style={{ color: "var(--text-secondary)" }}
               aria-label="Toggle theme">
@@ -80,7 +83,7 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
           )}
 
           {mounted && user && (
-            <div className="flex items-center gap-3 border-l pl-3" style={{ borderColor: "var(--border)" }}>
+            <div className="hidden items-center gap-3 border-l pl-3 sm:flex" style={{ borderColor: "var(--border)" }}>
               {isAnonymous ? (
                 <div className="flex items-center gap-2">
                   <span className="rounded-full bg-gray-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 border border-gray-500/20">
@@ -95,8 +98,8 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
                   <div className="flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-bold text-white shadow-sm" style={{ backgroundColor: "#7c6af7" }}>
                     {userIdentifier[0].toUpperCase()}
                   </div>
-                  <span className="hidden text-xs font-medium sm:block" style={{ color: "var(--text-secondary)" }}>
-                    {truncateEmail(userIdentifier)}
+                  <span className="hidden text-xs font-medium lg:block" style={{ color: "var(--text-secondary)" }}>
+                    {truncateEmail(userIdentifier, 15)}
                   </span>
                   <button onClick={handleLogout} className="text-xs font-bold transition-opacity hover:opacity-70" style={{ color: "var(--text-secondary)" }}>
                     Sign out
@@ -108,13 +111,15 @@ export default function Navbar({ onUploadClick }: NavbarProps) {
 
           {onUploadClick && (
             <button onClick={onUploadClick}
-              className="rounded-xl px-4 py-2 text-sm font-bold text-white shadow-lg transition-transform active:scale-[0.98]"
+              className="rounded-xl bg-accent px-3 py-2 text-xs font-bold text-white shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] sm:px-4 sm:text-sm"
               style={{ backgroundColor: "var(--accent)" }}>
-              Upload PDF
+              Upload
             </button>
           )}
         </div>
       </div>
     </nav>
   );
-}
+};
+
+export default React.memo(Navbar);

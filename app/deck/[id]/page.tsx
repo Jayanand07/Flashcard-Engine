@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -33,7 +33,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: d, error: de } = await supabase.from("decks").select("*").eq("id", deckId).single();
     if (de || !d) { setFetchError("Deck not found"); setLoading(false); return; }
@@ -49,11 +49,11 @@ export default function DeckPage({ params }: { params: { id: string } }) {
     setHistory(ObjectRes[1].data || []);
     setAllCards(ObjectRes[2].cards || []);
     setLoading(false);
-  };
+  }, [deckId]);
 
   useEffect(() => {
     fetchData();
-  }, [deckId]);
+  }, [fetchData]);
 
   const handleDelete = async () => {
     if (!deck || !confirm("Delete this deck?")) return;
