@@ -213,7 +213,8 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     );
   }
 
-  const progress = cards.length > 0 ? ((currentIndex + (isSubmitting ? 1 : 0)) / cards.length) * 100 : 0;
+  // Progress should show how far we are into the deck (current card index + 1)
+  const progress = cards.length > 0 ? ((currentIndex + 1) / cards.length) * 100 : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-grid-pattern" style={{ backgroundColor: "var(--bg)" }}>

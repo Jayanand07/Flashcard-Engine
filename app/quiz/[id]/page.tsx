@@ -210,7 +210,7 @@ export default function QuizPage({ params }: { params: { id: string } }) {
     );
   }
 
-  const progressValue = mcqs.length > 0 ? ((currentIndex + (showFeedback ? 1 : 0)) / mcqs.length) * 100 : 0;
+  const progressValue = mcqs.length > 0 ? ((currentIndex + 1) / mcqs.length) * 100 : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-grid-pattern" style={{ backgroundColor: "var(--bg)" }}>

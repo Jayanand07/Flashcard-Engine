@@ -30,6 +30,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [showRegenModal, setShowRegenModal] = useState(false);
+  const [regenType, setRegenType] = useState<"cards" | "quiz">("cards");
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
 
@@ -68,7 +69,10 @@ export default function DeckPage({ params }: { params: { id: string } }) {
     if (isRegenerating) return;
     setIsRegenerating(true);
     try {
-      const res = await fetch(`/api/regenerate/${deckId}`, { method: "POST" });
+      const res = await fetch(`/api/regenerate/${deckId}`, { 
+        method: "POST",
+        body: JSON.stringify({ type: regenType })
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Regeneration failed");
       
@@ -172,11 +176,18 @@ export default function DeckPage({ params }: { params: { id: string } }) {
                 🧠 Take Quiz
               </button>
               <button 
-                onClick={() => setShowRegenModal(true)}
+                onClick={() => { setRegenType("cards"); setShowRegenModal(true); }}
                 disabled={deck.regenerate_count! >= 10}
                 className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
                 style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}>
                 🔄 New Cards
+              </button>
+              <button 
+                onClick={() => { setRegenType("quiz"); setShowRegenModal(true); }}
+                disabled={deck.regenerate_count! >= 10}
+                className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50"
+                style={{ border: "1px solid var(--accent)", color: "var(--accent)" }}>
+                📥 New Quiz
               </button>
               <button onClick={handleDelete} disabled={isDeleting}
                 className="rounded-xl px-4 py-2.5 text-sm font-medium transition-colors"
@@ -308,9 +319,14 @@ export default function DeckPage({ params }: { params: { id: string } }) {
       {showRegenModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, backdropFilter: 'blur(4px)' }} className="animate-fade-in">
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px', padding: '32px', maxWidth: '400px', width: '90%', zIndex: 51 }} className="animate-bounce-in shadow-2xl">
-            <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>Generate 50 new cards?</h2>
+            <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+              {regenType === "cards" ? "Generate 20 new cards?" : "Generate 10 new questions?"}
+            </h2>
             <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
-              Your current cards will be saved to history. This will reset your progress for this deck.<br/><br/>
+              {regenType === "cards" 
+                ? "Your current cards will be replaced. This will reset your progress for this deck."
+                : "Your current quiz questions will be replaced by new AI-generated ones."}
+              <br/><br/>
               <strong>({deck.regenerate_count || 0}/10 regenerations used)</strong>
             </p>
             <div className="flex gap-3">
