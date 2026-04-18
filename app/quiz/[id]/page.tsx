@@ -95,6 +95,7 @@ export default function QuizPage({ params }: { params: { id: string } }) {
             accuracy: accuracy
           })
         });
+        router.refresh();
       } catch (err) {
         console.error("Failed to save quiz session:", err);
       }

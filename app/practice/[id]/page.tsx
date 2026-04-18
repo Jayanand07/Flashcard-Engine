@@ -50,9 +50,12 @@ export default function PracticePage({ params }: { params: { id: string } }) {
     // Fetch deck name for session save
     (async () => {
       try {
-        const { data } = await (await import("@/lib/supabase")).supabase.from("decks").select("name").eq("id", deckId).single();
-        if (data) setDeckName(data.name);
-      } catch {}
+        const deckRes = await fetch(`/api/decks/${deckId}`);
+        const deckData = await deckRes.json();
+        setDeckName(deckData.deck?.name || "Unknown Deck");
+      } catch (err) {
+        console.error("Failed to fetch deck name:", err);
+      }
     })();
   }, [deckId, fetchCards]);
 
@@ -90,7 +93,10 @@ export default function PracticePage({ params }: { params: { id: string } }) {
           cards_reviewed: total, easy_count: stats.easy, okay_count: stats.okay, hard_count: stats.hard, accuracy,
         }),
       });
-    } catch {}
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to save session:", err);
+    }
   };
 
   const handleRate = useCallback(async (rating: "hard" | "okay" | "easy") => {

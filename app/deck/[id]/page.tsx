@@ -22,6 +22,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
   const deckId = params.id;
   const [deck, setDeck] = useState<Deck | null>(null);
   const [cards, setCards] = useState<Card[]>([]);
+  const [allCards, setAllCards] = useState<Card[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
@@ -38,13 +39,15 @@ export default function DeckPage({ params }: { params: { id: string } }) {
     if (de || !d) { setFetchError("Deck not found"); setLoading(false); return; }
     setDeck(d);
 
-    const [cardsRes, historyRes] = await Promise.all([
+    const ObjectRes = await Promise.all([
       supabase.from("cards").select("*").eq("deck_id", deckId).order("created_at", { ascending: true }),
-      supabase.from("deck_history").select("*").eq("deck_id", deckId).order("generation_number", { ascending: false })
+      supabase.from("deck_history").select("*").eq("deck_id", deckId).order("generation_number", { ascending: false }),
+      fetch(`/api/cards/all?deckId=${deckId}`).then(res => res.json())
     ]);
 
-    setCards(cardsRes.data || []);
-    setHistory(historyRes.data || []);
+    setCards(ObjectRes[0].data || []);
+    setHistory(ObjectRes[1].data || []);
+    setAllCards(ObjectRes[2].cards || []);
     setLoading(false);
   };
 
@@ -68,6 +71,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
       if (!res.ok) throw new Error(data.error || "Regeneration failed");
       
       // Auto redirect to practice mode after successful regeneration
+      router.refresh();
       router.push(`/practice/${deckId}`);
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to regenerate");
@@ -96,11 +100,24 @@ export default function DeckPage({ params }: { params: { id: string } }) {
     </div>
   );
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return 'Unknown date'
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return 'Unknown date'
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
   const today = getTodayString();
-  const total = cards.length || 1;
-  const masteredCount = cards.filter(c => c.difficulty === "mastered").length;
-  const learningCount = cards.filter(c => c.difficulty === "learning").length;
-  const newCount = cards.filter(c => c.difficulty === "new").length;
+  const total = allCards.length || 1;
+  const masteredCount = allCards.filter(c => c.difficulty === "mastered").length;
+  const learningCount = allCards.filter(c => c.difficulty === "learning").length;
+  const newCount = allCards.filter(c => c.difficulty === "new").length;
   const dueToday = cards.filter(c => c.next_review <= today).length;
 
   const retention = Math.round((masteredCount / total) * 100);
@@ -213,7 +230,7 @@ export default function DeckPage({ params }: { params: { id: string } }) {
                     className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-medium transition-colors hover:bg-gray-50/50 dark:hover:bg-white/5"
                     style={{ color: "var(--text-primary)" }}
                   >
-                    <span>Generation {h.generation_number} — saved {new Date(h.saved_at).toLocaleDateString()}</span>
+                    <span>Generation {h.generation_number} — saved {formatDate(h.saved_at)}</span>
                     <span style={{ color: "var(--text-secondary)" }}>{h.cards.length} cards {expandedHistory === h.id ? "↑" : "↓"}</span>
                   </button>
                   {expandedHistory === h.id && (
@@ -275,8 +292,8 @@ export default function DeckPage({ params }: { params: { id: string } }) {
 
       {/* Regeneration Modal */}
       {showRegenModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm rounded-[24px] p-8 animate-bounce-in shadow-2xl" style={{ perspective: "1000px", background: "var(--surface)", border: "1px solid var(--border)" }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, backdropFilter: 'blur(4px)' }} className="animate-fade-in">
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '20px', padding: '32px', maxWidth: '400px', width: '90%', zIndex: 51 }} className="animate-bounce-in shadow-2xl">
             <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>Generate 50 new cards?</h2>
             <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
               Your current cards will be saved to history. This will reset your progress for this deck.<br/><br/>
