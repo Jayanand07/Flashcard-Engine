@@ -5,6 +5,8 @@ interface ProgressBarProps {
   learning: number;
   newCards: number;
   total: number;
+  height?: string;
+  showLegend?: boolean;
 }
 
 export default function ProgressBar({
@@ -12,43 +14,38 @@ export default function ProgressBar({
   learning,
   newCards,
   total,
+  height = "h-2",
+  showLegend = true,
 }: ProgressBarProps) {
   if (total === 0) return null;
 
-  const masteredPercent = (mastered / total) * 100;
-  const learningPercent = (learning / total) * 100;
-  const newPercent = (newCards / total) * 100;
+  const mp = (mastered / total) * 100;
+  const lp = (learning / total) * 100;
+  const np = (newCards / total) * 100;
 
   return (
     <div className="w-full">
-      <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-        <div
-          style={{ width: `${masteredPercent}%` }}
-          className="bg-emerald-500 transition-all duration-500"
-        />
-        <div
-          style={{ width: `${learningPercent}%` }}
-          className="bg-amber-400 transition-all duration-500"
-        />
-        <div
-          style={{ width: `${newPercent}%` }}
-          className="bg-gray-200 transition-all duration-500"
-        />
+      <div className={`flex ${height} w-full overflow-hidden rounded-full`} style={{ background: "var(--surface-2)" }}>
+        <div style={{ width: `${mp}%` }} className="bg-emerald-500 transition-all duration-700" />
+        <div style={{ width: `${lp}%` }} className="bg-amber-400 transition-all duration-700" />
+        <div style={{ width: `${np}%` }} className="transition-all duration-700" />
       </div>
-      <div className="mt-2 flex items-center gap-4 text-[11px] text-gray-400">
-        <div className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          {mastered}
+      {showLegend && (
+        <div className="mt-2.5 flex items-center gap-5 text-xs" style={{ color: "var(--text-secondary)" }}>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+            {mastered} Mastered
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+            {learning} Learning
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-2 rounded-full" style={{ background: "var(--border)" }} />
+            {newCards} New
+          </span>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-          {learning}
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-gray-200" />
-          {newCards}
-        </div>
-      </div>
+      )}
     </div>
   );
 }

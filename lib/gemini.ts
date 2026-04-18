@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Initialize the API client. This should only run on the server.
+// Server-side only — this file is only imported by API routes
 const apiKey = process.env.GEMINI_API_KEY!;
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
@@ -8,32 +8,39 @@ const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 export async function generateFlashcards(
   extractedText: string
 ): Promise<Array<{ question: string; answer: string }>> {
-  // Trim the text to max 15000 characters
   const trimmedText = extractedText.substring(0, 15000);
 
-  const prompt = `You are an expert educator and curriculum designer. 
-Analyze the following study material and create exactly 15 high-quality flashcards.
+  const prompt = `You are an expert teacher and educational content designer with 20 years of experience creating study material for students.
 
-Requirements for questions:
-- Test deep understanding, not surface memorization
-- Use 'What', 'Why', 'How', 'Explain' style questions
-- Each question should be clear and self-contained
+Your task is to generate the highest quality flashcards possible from the provided content. A lazy AI generates shallow definition cards. You generate cards that make students truly understand.
 
-Requirements for answers:
-- Concise but complete (2-4 sentences maximum)
-- Use simple language a student can understand
-- Include the key fact or concept directly
+CARD TYPES TO INCLUDE (mix all of these):
+- Conceptual: "What is X and why does it matter?"
+- Definitional: "Define [term] in simple words"
+- Relational: "How does X relate to Y?"
+- Application: "Give a real-world example of X"
+- Edge case: "What happens when X condition occurs?"
+- Worked example: "Walk through how to solve X"
+- Comparison: "What is the difference between X and Y?"
+- Cause & effect: "What causes X? What are its effects?"
+- Tricky: Questions that test deep understanding not surface recall
 
-CRITICAL: Return ONLY a valid JSON array. No markdown, no backticks, 
-no explanation text. Just raw JSON.
+STRICT RULES:
+- Generate exactly 20 cards minimum, 25 maximum
+- Every question must be specific, never vague
+- Every answer must be complete but concise (2-4 sentences max)
+- Never generate duplicate concepts
+- Never generate trivial or obvious cards
+- Questions must make sense WITHOUT reading the PDF
+- Answers must be self-contained and clear
+- Vary question types — never 3 same types in a row
+- If content has examples or worked problems — include them as cards
+- If content has formulas — include them with explanation
 
-Format:
-[
-  {"question": "your question here", "answer": "your answer here"},
-  {"question": "your question here", "answer": "your answer here"}
-]
+Return ONLY a valid JSON array, no markdown, no backticks:
+[{"question": "...", "answer": "..."}]
 
-Study material:
+Content:
 ${trimmedText}`;
 
   try {
@@ -41,13 +48,12 @@ ${trimmedText}`;
     const response = await result.response;
     let text = response.text();
 
-    // Clean it by strictly isolating the JSON Array from the first '[' to the last ']'
+    // Strictly isolate the JSON Array from the response
     const match = text.match(/\[[\s\S]*\]/);
     if (!match) {
       throw new Error("No JSON array found in the AI response");
     }
 
-    // Parse the JSON safely
     const flashcards = JSON.parse(match[0]);
     return flashcards;
   } catch (error) {

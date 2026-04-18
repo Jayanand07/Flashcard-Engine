@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { getTodayString } from "@/lib/sm2";
+import Navbar from "@/components/Navbar";
 import DeckCard from "@/components/DeckCard";
 import UploadModal from "@/components/UploadModal";
 
@@ -10,11 +12,8 @@ interface Deck {
   name: string;
   card_count: number;
   created_at: string;
-  stats?: {
-    mastered: number;
-    learning: number;
-    newCards: number;
-  };
+  stats?: { mastered: number; learning: number; newCards: number };
+  dueToday?: number;
 }
 
 export default function Dashboard() {
@@ -25,227 +24,141 @@ export default function Dashboard() {
 
   const fetchDecks = async () => {
     setLoading(true);
-
     const { data: decksData, error: decksError } = await supabase
-      .from("decks")
-      .select("*")
-      .order("created_at", { ascending: false });
+      .from("decks").select("*").order("created_at", { ascending: false });
 
-    if (decksError) {
-      console.error("Error fetching decks:", decksError);
-      setLoading(false);
-      return;
-    }
+    if (decksError || !decksData) { setDecks([]); setLoading(false); return; }
+    if (decksData.length === 0) { setDecks([]); setLoading(false); return; }
 
-    if (!decksData || decksData.length === 0) {
-      setDecks([]);
-      setLoading(false);
-      return;
-    }
+    const { data: cardsData } = await supabase.from("cards").select("deck_id, difficulty, next_review");
+    const today = getTodayString();
 
-    const { data: cardsData, error: cardsError } = await supabase
-      .from("cards")
-      .select("deck_id, difficulty");
-
-    if (!cardsError && cardsData) {
-      const statsMap: Record<
-        string,
-        { mastered: number; learning: number; newCards: number }
-      > = {};
-
-      cardsData.forEach((card) => {
-        if (!statsMap[card.deck_id]) {
-          statsMap[card.deck_id] = { mastered: 0, learning: 0, newCards: 0 };
-        }
-        if (card.difficulty === "mastered") statsMap[card.deck_id].mastered++;
-        else if (card.difficulty === "learning")
-          statsMap[card.deck_id].learning++;
-        else statsMap[card.deck_id].newCards++;
+    const statsMap: Record<string, { mastered: number; learning: number; newCards: number; due: number }> = {};
+    if (cardsData) {
+      cardsData.forEach((c) => {
+        if (!statsMap[c.deck_id]) statsMap[c.deck_id] = { mastered: 0, learning: 0, newCards: 0, due: 0 };
+        if (c.difficulty === "mastered") statsMap[c.deck_id].mastered++;
+        else if (c.difficulty === "learning") statsMap[c.deck_id].learning++;
+        else statsMap[c.deck_id].newCards++;
+        if (c.next_review <= today) statsMap[c.deck_id].due++;
       });
-
-      const processedDecks = decksData.map((deck) => ({
-        ...deck,
-        stats: statsMap[deck.id] || {
-          mastered: 0,
-          learning: 0,
-          newCards: deck.card_count,
-        },
-      }));
-
-      setDecks(processedDecks);
-    } else {
-      setDecks(decksData);
     }
 
+    setDecks(decksData.map((d) => ({
+      ...d,
+      stats: statsMap[d.id] ? { mastered: statsMap[d.id].mastered, learning: statsMap[d.id].learning, newCards: statsMap[d.id].newCards } : { mastered: 0, learning: 0, newCards: d.card_count },
+      dueToday: statsMap[d.id]?.due ?? 0,
+    })));
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchDecks();
-  }, []);
+  useEffect(() => { fetchDecks(); }, []);
 
-  const filteredDecks = decks.filter((deck) =>
-    deck.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const totalCards = decks.reduce((a, d) => a + d.card_count, 0);
+  const totalMastered = decks.reduce((a, d) => a + (d.stats?.mastered ?? 0), 0);
+  const totalDue = decks.reduce((a, d) => a + (d.dueToday ?? 0), 0);
+
+  const filteredDecks = decks.filter((d) => d.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="min-h-screen bg-stone-50">
-      {/* ── Navbar ── */}
-      <nav className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <span className="text-lg">⚡</span>
-            <span className="text-sm font-semibold tracking-tight text-gray-900">
-              FlashCard Engine
-            </span>
-          </div>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="btn-primary rounded-lg px-4 py-2 text-sm"
-          >
-            Upload PDF
-          </button>
-        </div>
-      </nav>
+    <div className="min-h-screen transition-colors duration-300" style={{ background: "var(--background)" }}>
+      <Navbar onUploadClick={() => setShowUploadModal(true)} />
 
-      <main className="mx-auto max-w-6xl px-6">
-        {/* ── Hero (only when no decks) ── */}
-        {decks.length === 0 && !loading && (
-          <>
-            <section className="pb-0 pt-24 animate-fade-up">
-              <div className="max-w-2xl">
-                <h1 className="text-5xl font-semibold tracking-tight text-gray-900 leading-[1.1]">
-                  Transform your PDFs
-                  <br />
-                  into flashcards
-                </h1>
-                <p className="mt-5 text-lg text-gray-600 leading-relaxed max-w-lg">
-                  Upload study material and let AI generate optimized flashcards.
-                  Master them with spaced repetition.
-                </p>
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="btn-primary mt-8 rounded-lg px-6 py-3 text-sm"
-                >
-                  Get started — upload a PDF
-                </button>
-              </div>
-            </section>
-
-            {/* ── How it works ── */}
-            <section className="mt-24 border-t border-gray-200 pt-16 animate-fade-up animate-delay-200">
-              <h2 className="mb-8 text-xs font-medium uppercase tracking-widest text-gray-400">
-                How it works
-              </h2>
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                {[
-                  {
-                    step: "01",
-                    title: "Upload PDF",
-                    text: "Drop any notes or textbook — we extract the content instantly.",
-                  },
-                  {
-                    step: "02",
-                    title: "AI generates cards",
-                    text: "Gemini AI creates 15 high-quality flashcards from your material.",
-                  },
-                  {
-                    step: "03",
-                    title: "Practice with SM-2",
-                    text: "Spaced repetition schedules reviews so you remember long-term.",
-                  },
-                ].map((item) => (
-                  <div key={item.step} className="py-2">
-                    <span className="text-xs font-medium text-gray-400">
-                      {item.step}
-                    </span>
-                    <h3 className="mt-2 text-base font-semibold text-gray-900">
-                      {item.title}
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-500 leading-relaxed">
-                      {item.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </>
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-16">
+        {/* ── Hero (empty state) ── */}
+        {!loading && decks.length === 0 && (
+          <section className="animate-fade-up py-20 text-center sm:py-28">
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl" style={{ color: "var(--text-primary)" }}>
+              Turn any PDF into
+              <br />
+              <span className="text-gradient">a learning machine</span>
+            </h1>
+            <p className="mx-auto mt-5 max-w-lg text-base sm:text-lg" style={{ color: "var(--text-secondary)" }}>
+              Upload study material. AI generates smart flashcards.
+              Spaced repetition makes them stick.
+            </p>
+            <button onClick={() => setShowUploadModal(true)} className="btn-accent animate-pulse-glow mt-8 px-8 py-3.5 text-sm">
+              Get started — upload a PDF
+            </button>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              {["AI Generated", "SM-2 Algorithm", "Tracks Progress"].map((t) => (
+                <span key={t} className="rounded-full px-3.5 py-1.5 text-xs font-semibold" style={{ background: "var(--surface-2)", color: "var(--text-secondary)", border: "1px solid var(--border)" }}>
+                  {t}
+                </span>
+              ))}
+            </div>
+          </section>
         )}
 
-        {/* ── Search ── */}
-        {(decks.length > 0 || searchQuery.length > 0) && (
-          <div className="pt-8 pb-2 animate-fade-up">
-            <input
-              type="text"
-              placeholder="Search decks..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full max-w-sm rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-gray-300 focus:ring-1 focus:ring-gray-200"
-            />
-          </div>
-        )}
-
-        {/* ── Section label ── */}
-        {decks.length > 0 && !loading && (
-          <div className="mt-6 mb-4 animate-fade-up animate-delay-100">
-            <h2 className="text-xs font-medium uppercase tracking-widest text-gray-400">
-              Your decks
-            </h2>
-          </div>
-        )}
-
-        {/* ── Content ── */}
-        {loading ? (
-          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="rounded-xl border border-gray-200 bg-white p-6">
-                <div className="skeleton-shimmer h-4 rounded w-3/4 mb-3" />
-                <div className="skeleton-shimmer h-3 rounded w-1/2 mb-4" />
-                <div className="skeleton-shimmer h-2 rounded w-full mb-6" />
-                <div className="flex gap-3">
-                  <div className="skeleton-shimmer h-9 flex-1 rounded-lg" />
-                  <div className="skeleton-shimmer h-9 flex-1 rounded-lg" />
+        {/* ── Stats bar ── */}
+        {!loading && decks.length > 0 && (
+          <div className="animate-fade-up mt-6 flex gap-3 overflow-x-auto pb-2">
+            {[
+              { icon: "📚", label: "Decks", value: decks.length },
+              { icon: "🃏", label: "Mastered", value: totalMastered },
+              { icon: "⏰", label: "Due today", value: totalDue },
+              { icon: "📝", label: "Total cards", value: totalCards },
+            ].map((s) => (
+              <div key={s.label} className="flex min-w-[120px] items-center gap-2.5 rounded-xl px-4 py-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+                <span className="text-lg">{s.icon}</span>
+                <div>
+                  <div className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{s.value}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: "var(--text-secondary)" }}>{s.label}</div>
                 </div>
               </div>
             ))}
           </div>
-        ) : decks.length === 0 ? (
-          /* Empty state is handled by hero */
-          null
-        ) : filteredDecks.length === 0 ? (
+        )}
+
+        {/* ── Search ── */}
+        {(decks.length > 0 || searchQuery.length > 0) && (
+          <div className="animate-fade-up mt-6 relative">
+            <svg className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "var(--text-secondary)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+            <input
+              type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search decks..."
+              className="w-full max-w-sm rounded-xl py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:ring-2"
+              style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-primary)", "--tw-ring-color": "var(--accent)" } as React.CSSProperties}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--text-secondary)" }}>✕</button>
+            )}
+          </div>
+        )}
+
+        {/* ── Section label ── */}
+        {!loading && decks.length > 0 && (
+          <h2 className="animate-fade-up animate-delay-100 mt-8 mb-4 text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--text-secondary)" }}>
+            Your Decks
+          </h2>
+        )}
+
+        {/* ── Content ── */}
+        {loading ? (
+          <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-2xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+                <div className="skeleton-shimmer h-5 w-3/4 rounded mb-3" />
+                <div className="skeleton-shimmer h-3 w-1/2 rounded mb-5" />
+                <div className="skeleton-shimmer h-10 w-full rounded-xl" />
+              </div>
+            ))}
+          </div>
+        ) : filteredDecks.length === 0 && searchQuery ? (
           <div className="mt-16 text-center animate-fade-in">
-            <p className="text-sm text-gray-500">
-              No decks match &quot;{searchQuery}&quot;
-            </p>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>No results for &quot;{searchQuery}&quot;</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             {filteredDecks.map((deck, idx) => (
-              <div
-                key={deck.id}
-                className={`animate-fade-up ${idx < 6 ? `animate-delay-${Math.min(idx + 1, 5) * 100}` : ''}`}
-              >
+              <div key={deck.id} className={`animate-fade-up animate-delay-${Math.min((idx + 1) * 100, 500)}`}>
                 <DeckCard deck={deck} onDeleted={fetchDecks} />
               </div>
             ))}
           </div>
         )}
-
-        {/* ── Footer ── */}
-        <footer className="mt-24 border-t border-gray-200 py-8">
-          <p className="text-xs text-gray-400">
-            Built with Gemini AI · SM-2 Spaced Repetition · Next.js
-          </p>
-        </footer>
       </main>
 
-      <UploadModal
-        isOpen={showUploadModal}
-        onClose={() => setShowUploadModal(false)}
-        onSuccess={(deckId) => {
-          setShowUploadModal(false);
-        }}
-      />
+      <UploadModal isOpen={showUploadModal} onClose={() => setShowUploadModal(false)} onSuccess={() => { setShowUploadModal(false); fetchDecks(); }} />
     </div>
   );
 }

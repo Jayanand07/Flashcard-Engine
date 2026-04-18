@@ -1,22 +1,11 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
-
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
 
 export const metadata: Metadata = {
   title: "FlashCard Engine — AI-Powered Spaced Repetition",
   description:
-    "Transform your PDFs into optimized flashcards with AI. Study smarter with spaced repetition powered by the SM-2 algorithm.",
+    "Transform any PDF into smart flashcards. AI generates cards from your study material, then spaced repetition helps you remember forever.",
 };
 
 export default function RootLayout({
@@ -25,11 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -16,20 +16,48 @@ export async function GET(req: NextRequest) {
 
     let query = supabase.from("cards").select("*").eq("deck_id", deck_id);
 
-    // If due_only flag is specified, get cards due today OR overdue
     if (due_only === "true") {
-      query = query.lte("next_review", getTodayString());
+      // Smart card selection: overdue first, then new, exclude mastered, limit 20
+      const today = getTodayString();
+
+      // 1. Get overdue + new cards (not mastered)
+      const { data: priorityCards, error: e1 } = await supabase
+        .from("cards")
+        .select("*")
+        .eq("deck_id", deck_id)
+        .neq("difficulty", "mastered")
+        .or(`next_review.lte.${today},difficulty.eq.new`)
+        .order("next_review", { ascending: true })
+        .limit(20);
+
+      if (e1) throw new Error(`Failed to fetch cards: ${e1.message}`);
+
+      // 2. If we got enough, return them
+      if (priorityCards && priorityCards.length > 0) {
+        return NextResponse.json(priorityCards, { status: 200 });
+      }
+
+      // 3. Fallback: include mastered cards if nothing else available
+      const { data: fallbackCards, error: e2 } = await supabase
+        .from("cards")
+        .select("*")
+        .eq("deck_id", deck_id)
+        .lte("next_review", today)
+        .order("next_review", { ascending: true })
+        .limit(20);
+
+      if (e2) throw new Error(`Failed to fetch cards: ${e2.message}`);
+      return NextResponse.json(fallbackCards || [], { status: 200 });
     }
 
-    // Order by most overdue to least
-    query = query.order("next_review", { ascending: true });
+    // Non-due: return all cards
+    const { data: cards, error } = await supabase
+      .from("cards")
+      .select("*")
+      .eq("deck_id", deck_id)
+      .order("next_review", { ascending: true });
 
-    const { data: cards, error } = await query;
-
-    if (error) {
-      throw new Error(`Failed to fetch cards: ${error.message}`);
-    }
-
+    if (error) throw new Error(`Failed to fetch cards: ${error.message}`);
     return NextResponse.json(cards, { status: 200 });
   } catch (error) {
     console.error("Cards GET API Error:", error);
