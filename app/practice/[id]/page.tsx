@@ -175,6 +175,11 @@ export default function PracticePage({ params }: { params: { id: string } }) {
 
   return (
     <div className="flex min-h-screen flex-col" style={{ background: "var(--bg)" }}>
+      {/* Ambient orbs */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-20 -right-20 w-72 h-72 bg-violet-500/15 rounded-full blur-3xl animate-pulse" style={{animationDuration:'5s'}}/>
+        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-purple-500/15 rounded-full blur-3xl animate-pulse" style={{animationDuration:'7s',animationDelay:'2s'}}/>
+      </div>
       {/* Top bar */}
       <div className="border-b" style={{ background: "var(--surface)", borderColor: "var(--border)" }}>
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3 sm:px-6">

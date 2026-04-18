@@ -58,9 +58,9 @@ export default function DeckCard({ deck, onDeleted }: DeckCardProps) {
   }
 
   return (
-    <div className="group relative flex flex-col rounded-[20px] p-6 transition-all duration-200 hover:-translate-y-0.5"
-      style={{ background: "var(--surface)", border: "1px solid var(--border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = "#a78bfa"; }}
+    <div className="group relative flex flex-col rounded-[20px] p-6 transition-all duration-200 hover:-translate-y-0.5 bg-gradient-to-br from-white to-gray-50/50 dark:from-[#1a1a24] dark:to-[#16161e]"
+      style={{ border: "1px solid var(--border)", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 40px rgba(124,106,247,0.2)"; e.currentTarget.style.borderColor = "#a78bfa"; }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; e.currentTarget.style.borderColor = "var(--border)"; }}>
 
       {/* Delete */}

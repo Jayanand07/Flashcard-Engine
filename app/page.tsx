@@ -59,22 +59,46 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen bg-grid-pattern" style={{ background: "var(--bg)" }}>
       <Navbar onUploadClick={() => setShowUploadModal(true)} />
 
-      <main className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+      {/* ── Floating orbs + particles ── */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-40 -left-40 w-96 h-96 sm:w-96 sm:h-96 w-48 h-48 bg-violet-500/20 rounded-full blur-3xl animate-pulse" style={{animationDuration:'4s'}}/>
+        <div className="absolute -top-20 -right-20 w-72 h-72 sm:w-72 sm:h-72 w-36 h-36 bg-blue-500/15 rounded-full blur-3xl animate-pulse" style={{animationDuration:'6s',animationDelay:'1s'}}/>
+        <div className="absolute -bottom-40 -right-40 w-96 h-96 sm:w-96 sm:h-96 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{animationDuration:'5s',animationDelay:'2s'}}/>
+        <div className="absolute -bottom-20 -left-20 w-64 h-64 sm:w-64 sm:h-64 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl animate-pulse" style={{animationDuration:'7s',animationDelay:'0.5s'}}/>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-violet-500/5 rounded-full blur-3xl"/>
+        <div className="particle" style={{top:'20%',left:'10%',animationDuration:'8s'}}/>
+        <div className="particle" style={{top:'60%',left:'85%',animationDuration:'12s',animationDelay:'2s'}}/>
+        <div className="particle" style={{top:'40%',left:'70%',animationDuration:'10s',animationDelay:'4s'}}/>
+        <div className="particle" style={{top:'80%',left:'30%',animationDuration:'9s',animationDelay:'1s'}}/>
+        <div className="particle" style={{top:'15%',left:'60%',animationDuration:'11s',animationDelay:'3s'}}/>
+        <div className="particle" style={{top:'70%',left:'15%',animationDuration:'13s',animationDelay:'5s'}}/>
+      </div>
+
+      <main className="relative z-10 mx-auto max-w-6xl px-4 pb-20 sm:px-6">
 
         {/* ── Hero empty state ── */}
         {!loading && decks.length === 0 && (
           <section className="animate-fade-up py-24 text-center sm:py-32">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl" style={{ color: "var(--text)" }}>
-              Turn any PDF into<br /><span className="text-gradient">a learning machine</span>
+            <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-4 py-2 mb-8 text-sm font-medium text-violet-600 dark:text-violet-400">
+              <span className="w-2 h-2 bg-violet-500 rounded-full animate-pulse"/>
+              Powered by Gemini AI
+            </div>
+            <h1 className="text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl" style={{ color: "var(--text)" }}>
+              Turn any PDF into
             </h1>
-            <p className="mx-auto mt-5 max-w-md text-base sm:text-lg" style={{ color: "var(--text-muted)" }}>
-              Upload study material. AI generates smart flashcards.<br />Spaced repetition makes them stick.
+            <h1 className="mt-2 text-5xl font-bold tracking-tight sm:text-6xl md:text-7xl">
+              <span className="bg-gradient-to-r from-violet-500 via-purple-500 to-pink-500 bg-clip-text text-transparent animate-gradient-x" style={{ backgroundSize: "200% auto" }}>
+                a learning machine
+              </span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-lg text-lg text-gray-500 dark:text-gray-400 sm:text-xl">
+              Upload study material. AI generates smart flashcards.<br/>Spaced repetition makes them stick forever.
             </p>
             <button onClick={() => setShowUploadModal(true)}
-              className="mt-8 rounded-xl bg-violet-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700">
+              className="mt-10 rounded-xl bg-violet-600 px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-violet-700">
               Get started — Upload a PDF
             </button>
             <div className="mt-7 flex flex-wrap justify-center gap-2">
@@ -89,7 +113,7 @@ export default function Dashboard() {
         {!loading && decks.length > 0 && (
           <div className="animate-fade-up mt-7 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {statCards.map(s => (
-              <div key={s.label} className="overflow-hidden rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+              <div key={s.label} className="stat-card-shimmer overflow-hidden rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
                 <div style={{ height: 4, background: s.color }} />
                 <div className="px-5 py-4">
                   <div className="text-[32px] font-bold leading-none" style={{ color: "var(--text)" }}>{s.value}</div>
