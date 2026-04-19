@@ -80,7 +80,7 @@ const Navbar = ({ onUploadClick }: NavbarProps) => {
         <div className="flex items-center gap-2 sm:gap-3">
           {mounted && (
             <button onClick={handleThemeToggle}
-              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-white/10"
+              className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/10"
               style={{ color: "var(--text-secondary)" }}
               aria-label="Toggle theme">
               {theme === "dark" ? (

@@ -16,7 +16,7 @@ By combining **Gemini 1.5 Flash AI** with the scientific **SM-2 Spaced Repetitio
 ## ✨ Key Features
 
 ### 🧠 Smart AI Generation
-Stop creating cards; start learning. Upload any PDF (textbooks, research papers, lecture notes) and our educator-tuned prompt generates **50 comprehensive flashcards** across a strict cognitive distribution:
+Stop creating cards; start learning. Upload any PDF (textbooks, research papers, lecture notes) and our educator-tuned prompt generates **20 comprehensive flashcards** across a strict cognitive distribution:
 - Core Definitions
 - Deep "Why/How" Analysis
 - Relationship Comparisons
@@ -60,21 +60,90 @@ GEMINI_API_KEY=your_google_gemini_api_key
 ```
 
 ### 3. Database Migration
-Run the following SQL in your Supabase SQL Editor to initialize the schema and security:
-
 ```sql
--- Tables & Columns
-ALTER TABLE decks ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
-ALTER TABLE cards ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
-ALTER TABLE mcqs ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth.users(id);
+-- Core tables
+CREATE TABLE IF NOT EXISTS decks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  card_count INTEGER DEFAULT 0,
+  user_id UUID REFERENCES auth.users(id),
+  last_studied TIMESTAMPTZ,
+  regenerate_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 
--- Enable Security
+CREATE TABLE IF NOT EXISTS cards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  difficulty TEXT DEFAULT 'new',
+  next_review DATE DEFAULT CURRENT_DATE,
+  interval INTEGER DEFAULT 1,
+  ease_factor FLOAT DEFAULT 2.5,
+  user_id UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS mcqs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  options JSONB NOT NULL,
+  correct_index INTEGER NOT NULL,
+  explanation TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
+  deck_name TEXT NOT NULL,
+  cards_reviewed INTEGER NOT NULL,
+  easy_count INTEGER DEFAULT 0,
+  okay_count INTEGER DEFAULT 0,
+  hard_count INTEGER DEFAULT 0,
+  accuracy INTEGER DEFAULT 0,
+  user_id UUID REFERENCES auth.users(id),
+  completed_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS quiz_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
+  deck_name TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  total_questions INTEGER NOT NULL,
+  accuracy INTEGER NOT NULL,
+  user_id UUID REFERENCES auth.users(id),
+  completed_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS deck_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  deck_id UUID REFERENCES decks(id) ON DELETE CASCADE,
+  generation_number INTEGER NOT NULL,
+  cards JSONB NOT NULL,
+  user_id UUID REFERENCES auth.users(id),
+  saved_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable RLS
 ALTER TABLE decks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mcqs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quiz_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deck_history ENABLE ROW LEVEL SECURITY;
 
--- Privacy Policies
-CREATE POLICY "Users can only see their own decks" ON decks FOR ALL USING (auth.uid() = user_id);
-CREATE POLICY "Users can only see their own cards" ON cards FOR ALL USING (auth.uid() = user_id);
+-- RLS Policies
+CREATE POLICY "Enable all for own data" ON decks FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Enable all for own data" ON cards FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Enable all for own data" ON mcqs FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Enable all for own data" ON sessions FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Enable all for own data" ON quiz_sessions FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Enable all for own data" ON deck_history FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 ```
 
 ### 4. Run Development

@@ -121,7 +121,7 @@ export default function Dashboard() {
 
             {/* Description */}
             <p className="mb-12 max-w-lg text-lg font-medium leading-relaxed text-secondary sm:text-xl">
-              Upload study material. AI generates 50 smart flashcards. <br className="hidden sm:block"/>
+              Upload study material. AI generates 20 smart flashcards. <br className="hidden sm:block"/>
               Spaced repetition makes them stick forever.
             </p>
 
@@ -175,7 +175,7 @@ export default function Dashboard() {
             {/* Stats Grid */}
             <div className="mb-12 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {stats.map((s, i) => (
-                <div key={i} className="stat-card-shimmer flex flex-col rounded-2xl border bg-surface p-6 shadow-sm transition-transform hover:-translate-y-0.5">
+                <div key={i} className="stat-card-shimmer flex flex-col rounded-2xl border bg-surface p-6 shadow-sm transition-transform hover:-translate-y-0.5" style={{ borderColor: 'var(--border)' }}>
                    <span className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: "var(--text-secondary)" }}>{s.label}</span>
                    <span className="mt-1 text-3xl font-black tabular-nums" style={{ color: "var(--text-primary)" }}>{s.value}</span>
                 </div>

@@ -252,7 +252,7 @@ export default function QuizPage({ params }: { params: { id: string } }) {
                      className={`group relative flex h-[64px] w-full items-center gap-4 rounded-2xl border-2 px-6 text-left transition-all ${statusValue === 'idle' ? 'hover:translate-x-1 hover:border-accent active:scale-[0.99]' : ''}`}
                      style={{
                         backgroundColor: statusValue === 'correct' ? '#dcfce7' : statusValue === 'wrong' ? '#fee2e2' : 'var(--surface)',
-                        borderColor: statusValue === 'correct' ? '#22c55e' : statusValue === 'wrong' ? '#ef4444' : 'var(--border)',
+                        borderColor: statusValue === 'correct' ? '#22c55e' : statusValue === 'wrong' ? '#ef4444' : 'rgba(124, 106, 247, 0.15)',
                         color: statusValue === 'idle' ? 'var(--text-primary)' : '#0a0a0f'
                      }}>
                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-black transition-colors ${isSelected ? 'bg-accent border-accent text-white' : 'border-gray-200 group-hover:border-accent group-hover:text-accent'}`}>
@@ -286,7 +286,7 @@ export default function QuizPage({ params }: { params: { id: string } }) {
             <h2 className="text-3xl font-black mb-3">No quiz available yet</h2>
             <p className="text-secondary max-w-sm mx-auto mb-8 font-medium">
               This deck was created before Quiz mode was added. 
-              Regenerate this deck to get 20 MCQ questions!
+              Regenerate this deck to get 10 MCQ questions!
             </p>
             <button onClick={() => router.push(`/deck/${deckId}`)}
               className="rounded-2xl bg-accent px-8 py-4 text-sm font-black text-white shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98]">

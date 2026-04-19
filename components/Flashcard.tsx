@@ -41,7 +41,7 @@ const Flashcard = ({ question, answer, isFlipped, onFlip }: FlashcardProps) => {
             backfaceVisibility: "hidden", 
             WebkitBackfaceVisibility: "hidden", 
             transform: "rotateY(180deg)", 
-            background: "var(--bg)", // Slight difference for back face
+            background: "var(--surface)", 
             border: "1px solid var(--border)", 
             boxShadow: "0 0 0 1px var(--border), 0 40px 80px rgba(0,0,0,0.1), 0 0 60px rgba(124,106,247,0.08)" 
           }}>
